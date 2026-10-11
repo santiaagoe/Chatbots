@@ -1,0 +1,6 @@
+streamlit>=1.50
+google-genai>=1.40
+fastmcp>=2.12
+python-dotenv>=1.0
+pydantic>=2.7
+pytest>=8.0
