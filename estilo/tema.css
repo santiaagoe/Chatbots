@@ -1,0 +1,299 @@
+/* ==========================================================================
+   221B Baker Street · tema visual
+   Estudio de Holmes de noche: carbón, cuero, latón y luz de velas.
+   Los selectores apuntan a los data-testid de Streamlit (probado con 1.65).
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@600&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Pinyon+Script&family=Special+Elite&display=swap');
+
+:root {
+  --carbon: #0E0F0D;
+  --panel: #17150F;
+  --hoja: #211C15;
+  --hoja-clara: #2B251C;
+  --cuero: #1C1813;
+  --oro: #D4AF61;
+  --oro-claro: #F3DC9A;
+  --oro-oscuro: #8C6A2E;
+  --lacre: #7A1E1A;
+  --crema: #E8DCC0;
+  --crema-tenue: #B9AC8E;
+  --tinta-dorada: #E9C77B;
+  --display: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  --titulos: 'Cinzel', Georgia, serif;
+  --texto: 'Libre Caslon Text', Georgia, serif;
+  --script: 'Pinyon Script', 'Libre Caslon Text', cursive;
+  --maquina: 'Special Elite', 'Courier New', monospace;
+}
+
+/* ---------- Fondo general: carbón con la luz de las velas ---------- */
+[data-testid="stApp"] {
+  background:
+    radial-gradient(circle at 100% 100%, rgba(255, 170, 70, .20), transparent 28%),
+    radial-gradient(circle at 98% 18%, rgba(255, 180, 90, .14), transparent 24%),
+    radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, .7), transparent 60%),
+    radial-gradient(ellipse at 50% 40%, #1A1C17 0%, var(--carbon) 75%);
+  color: var(--crema);
+  font-family: var(--texto);
+}
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stApp"] p, [data-testid="stApp"] li { font-family: var(--texto); }
+
+/* ---------- El marco dorado del área principal ---------- */
+[data-testid="stMainBlockContainer"] {
+  max-width: 860px;
+  margin-top: 2.2rem;
+  margin-bottom: 1rem;
+  padding: 2.4rem 2.6rem 2rem;
+  position: relative;
+  background:
+    /* esquinas ornamentadas */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' fill='none' stroke='%23D4AF61' stroke-width='1.6'><path d='M4 86V4h82'/><path d='M12 86V12h74' stroke-width='.8'/><path d='M4 40c14 0 22-8 22-22 0-6-4-9-8-9s-7 3-7 7 3 6 6 6'/><path d='M40 4c0 14-8 22-22 22'/><circle cx='26' cy='26' r='3' fill='%23D4AF61'/><path d='M30 30c10 4 18 4 26 0M30 30c4 10 4 18 0 26' stroke-width='1'/></svg>") left top / 90px no-repeat,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' fill='none' stroke='%23D4AF61' stroke-width='1.6'><g transform='translate(90 0) scale(-1 1)'><path d='M4 86V4h82'/><path d='M12 86V12h74' stroke-width='.8'/><path d='M4 40c14 0 22-8 22-22 0-6-4-9-8-9s-7 3-7 7 3 6 6 6'/><path d='M40 4c0 14-8 22-22 22'/><circle cx='26' cy='26' r='3' fill='%23D4AF61'/><path d='M30 30c10 4 18 4 26 0M30 30c4 10 4 18 0 26' stroke-width='1'/></g></svg>") right top / 90px no-repeat,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' fill='none' stroke='%23D4AF61' stroke-width='1.6'><g transform='translate(0 90) scale(1 -1)'><path d='M4 86V4h82'/><path d='M12 86V12h74' stroke-width='.8'/><path d='M4 40c14 0 22-8 22-22 0-6-4-9-8-9s-7 3-7 7 3 6 6 6'/><path d='M40 4c0 14-8 22-22 22'/><circle cx='26' cy='26' r='3' fill='%23D4AF61'/></g></svg>") left bottom / 90px no-repeat,
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' fill='none' stroke='%23D4AF61' stroke-width='1.6'><g transform='translate(90 90) scale(-1 -1)'><path d='M4 86V4h82'/><path d='M12 86V12h74' stroke-width='.8'/><path d='M4 40c14 0 22-8 22-22 0-6-4-9-8-9s-7 3-7 7 3 6 6 6'/><path d='M40 4c0 14-8 22-22 22'/><circle cx='26' cy='26' r='3' fill='%23D4AF61'/></g></svg>") right bottom / 90px no-repeat,
+    /* la calle de Londres, apenas visible detrás del texto */
+    linear-gradient(180deg, rgba(23, 21, 15, .80) 0%, rgba(23, 21, 15, .90) 45%, rgba(23, 21, 15, .97) 100%),
+    url("app/static/calle_londres.jpg") center 150px / 78% auto no-repeat,
+    /* grano del papel */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .75  0 0 0 0 .62  0 0 0 0 .4  0 0 0 .06 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>"),
+    var(--panel);
+  border: 1px solid rgba(212, 175, 97, .55);
+  box-shadow: 0 0 0 6px var(--panel), 0 0 0 7px rgba(212, 175, 97, .35), 0 30px 60px rgba(0, 0, 0, .6);
+  border-radius: 3px;
+}
+
+/* ---------- Encabezado: título dorado con ornamentos ---------- */
+.cabecera { text-align: center; margin: .2rem 0 1.6rem; }
+.cabecera svg { display: block; margin: 0 auto; width: min(420px, 80%); height: auto; }
+.cabecera .titulo-221b {
+  font-family: var(--display); font-weight: 700; line-height: 1.05; margin: .35rem 0 .3rem;
+  font-size: clamp(2.1rem, 5.4vw, 3.6rem); letter-spacing: .01em;
+  background: linear-gradient(180deg, #FFF0C2 0%, #F0CF7E 38%, #C99A45 62%, #F6DE9E 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(60, 38, 8, .9)) drop-shadow(0 0 18px rgba(240, 190, 90, .25));
+}
+.cabecera .subtitulo-221b { font-family: var(--texto); color: var(--crema); font-size: 1.15rem; margin: 0 0 .5rem; letter-spacing: .01em; }
+.entrada-escena { font-style: italic; color: var(--crema-tenue); text-align: center; max-width: 34rem;
+  margin: 0 auto 1.4rem; line-height: 1.7; }
+
+/* ---------- Mensajes ---------- */
+[data-testid="stChatMessage"] { background: transparent; padding: .25rem 0; gap: .9rem; }
+[data-testid="stChatMessageContent"] { color: var(--crema); }
+/* Holmes: hoja de papel envejecido */
+[data-testid="stChatMessage"]:has([aria-label="Chat message from assistant"]) [data-testid="stChatMessageContent"] {
+  background: linear-gradient(180deg, var(--hoja-clara), var(--hoja));
+  border: 1px solid rgba(212, 175, 97, .30);
+  border-radius: 2px;
+  padding: .9rem 1.15rem .75rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .45), inset 0 0 40px rgba(0, 0, 0, .25);
+}
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
+  font-size: 1.05rem; line-height: 1.68; color: var(--crema);
+}
+/* El visitante: a la derecha, con un filo de latón */
+[data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) { flex-direction: row-reverse; }
+[data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) > div:first-child { display: none; }
+[data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) [data-testid="stChatMessageContent"] {
+  flex: 0 1 auto; max-width: 78%; margin-left: auto;
+  background: rgba(14, 15, 13, .78); border: 1px solid rgba(212, 175, 97, .22);
+  border-right: 3px solid var(--oro); border-radius: 6px 2px 2px 6px; padding: .55rem 1rem;
+}
+[data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) p { font-style: italic; }
+[data-testid="stChatMessage"] > img[alt="assistant avatar"] {
+  width: 46px; height: 46px; flex: 0 0 46px; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, .6), 0 0 14px rgba(212, 175, 97, .35); }
+[data-testid="stChatMessageContent"] [data-testid="stImage"] img,
+[data-testid="stChatMessageContent"] [data-testid="stFullScreenFrame"] img { border-radius: 2px; }
+
+/* Imágenes de la escena: grabado enmarcado */
+[data-testid="stChatMessageContent"] [data-testid="stImage"] {
+  padding: 6px; background: #0F0D0A; border: 1px solid rgba(212, 175, 97, .5);
+  box-shadow: inset 0 0 0 3px #0F0D0A, inset 0 0 0 4px rgba(212, 175, 97, .25);
+}
+[data-testid="stImageCaption"], [data-testid="stCaptionContainer"] { color: var(--crema-tenue) !important; font-style: italic; }
+
+/* ---------- Botones con sello de lacre ---------- */
+[class*="st-key-accion_"] button,
+[class*="st-key-interrogar"] button {
+  position: relative; min-height: 58px; padding: .35rem .8rem .35rem 3.35rem !important;
+  background: linear-gradient(180deg, #2A251D, #15120E) !important;
+  border: 2px solid var(--oro) !important; border-radius: 30px 10px 10px 30px !important;
+  color: var(--oro-claro) !important; box-shadow: 0 0 14px rgba(212, 175, 97, .22), inset 0 1px 0 rgba(255, 230, 170, .15);
+  justify-content: flex-start !important; text-align: left;
+}
+[class*="st-key-accion_"] button *,
+[class*="st-key-interrogar"] button * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+  word-break: normal !important; overflow-wrap: normal !important; hyphens: none; }
+[class*="st-key-accion_"] button p,
+[class*="st-key-interrogar"] button p { font-family: var(--texto) !important; font-size: 1rem !important; line-height: 1.18; color: var(--oro-claro); }
+[class*="st-key-accion_"] button::before,
+[class*="st-key-interrogar"] button::before {
+  content: ""; position: absolute; left: 5px; top: 50%; width: 40px; height: 40px; margin-top: -20px; border-radius: 50%;
+  background-position: center; background-repeat: no-repeat; background-size: 19px, cover;
+  box-shadow: 0 0 0 2px var(--oro), 0 2px 6px rgba(0, 0, 0, .6);
+}
+[class*="st-key-accion_"] button:hover, [class*="st-key-interrogar"] button:hover {
+  box-shadow: 0 0 22px rgba(240, 190, 90, .45) !important; border-color: var(--oro-claro) !important;
+}
+[class*="st-key-accion_"] button:focus-visible, [class*="st-key-interrogar"] button:focus-visible {
+  outline: 2px solid var(--oro-claro); outline-offset: 3px;
+}
+.st-key-accion_escena button::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F3DC9A' stroke-width='2.2' stroke-linecap='round'><circle cx='10' cy='10' r='6'/><path d='M14.5 14.5 20 20'/></svg>"),
+                    radial-gradient(circle at 35% 30%, #B23A2C, #6A1612 60%, #3E0B09);
+}
+.st-key-accion_repasar button::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F3DC9A' stroke-width='2' stroke-linecap='round'><rect x='5' y='4' width='14' height='17' rx='1.5'/><path d='M9 3h6v3H9zM8.5 10h7M8.5 13.5h7M8.5 17h4.5'/></svg>"),
+                    radial-gradient(circle at 35% 30%, #B23A2C, #6A1612 60%, #3E0B09);
+}
+.st-key-accion_acusar button::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F3DC9A' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v17M7 20h10M5 6h14M5 6l-3 7h6zM19 6l-3 7h6z'/></svg>"),
+                    radial-gradient(circle at 35% 30%, #B23A2C, #6A1612 60%, #3E0B09);
+}
+[class*="st-key-interrogar"] button::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F3DC9A' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'><path d='M6 20v-3.5C3.8 15 3 12.8 3 10.5 3 6.4 6.4 3 10.5 3S18 6 18 9.5l1.6 3.2c.2.5-.1.8-.6.8H18v2.5c0 1.1-.9 2-2 2h-2v2'/><path d='M20.5 6.5c.8.8 1.2 1.9 1.2 3s-.4 2.2-1.2 3'/></svg>"),
+                    radial-gradient(circle at 35% 30%, #B23A2C, #6A1612 60%, #3E0B09);
+}
+/* El menú «Interrogar a…» y sus opciones */
+[data-testid="stPopoverBody"] { background: var(--hoja) !important; border: 1px solid var(--oro) !important; }
+[data-testid="stPopoverBody"] button {
+  background: transparent !important; border: 1px solid rgba(212, 175, 97, .4) !important; color: var(--crema) !important;
+  justify-content: flex-start !important;
+}
+[data-testid="stPopoverBody"] button:hover { border-color: var(--oro) !important; color: var(--oro-claro) !important; }
+.titulo-acciones { color: var(--crema-tenue); font-style: italic; margin: .6rem 0 .5rem; }
+
+/* ---------- La barra de escritura: un cilindro de latón ---------- */
+[data-testid="stBottom"], [data-testid="stBottom"] > div { background: transparent !important; }
+[data-testid="stBottomBlockContainer"] { max-width: 860px; padding-bottom: 1.4rem; }
+[data-testid="stChatInput"] {
+  position: relative; border-radius: 12px !important; padding: 7px 46px !important; border: none !important;
+  background: linear-gradient(180deg, #F6DE9E 0%, #C99A45 30%, #7E5B22 55%, #B98B3C 80%, #E9C77B 100%) !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .65), 0 0 18px rgba(212, 175, 97, .25);
+}
+[data-testid="stChatInput"]::before, [data-testid="stChatInput"]::after { /* tapas del cilindro */
+  content: ""; position: absolute; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #FFF0C2, #A8802F 60%, #5E4313);
+  box-shadow: 0 0 0 2px rgba(60, 40, 10, .6);
+}
+[data-testid="stChatInput"]::before { left: 12px; }
+[data-testid="stChatInput"]::after { right: 12px; }
+[data-testid="stChatInput"] > div { background: #0F0E0B !important; border-radius: 6px; border: 1px solid #3B2C12; }
+[data-testid="stChatInputTextArea"] {
+  color: var(--crema) !important; font-family: var(--texto) !important; font-size: 1.05rem !important;
+  caret-color: var(--oro);
+}
+[data-testid="stChatInputTextArea"]::placeholder { font-family: var(--script); font-size: 1.6rem; color: var(--oro); opacity: .85; }
+[data-testid="stChatInputSubmitButton"] { color: var(--oro-claro) !important; }
+
+/* ---------- La libreta de Holmes (barra lateral) ---------- */
+[data-testid="stSidebar"] {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, .55) 0, rgba(0, 0, 0, 0) 64px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='c'><feTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .4  0 0 0 0 .3  0 0 0 .08 0'/></filter><rect width='200' height='200' filter='url(%23c)'/></svg>"),
+    var(--cuero) !important;
+  border-right: 2px solid #0A0907;
+  box-shadow: inset -6px 0 0 #2A231A, inset -8px 0 0 rgba(212, 175, 97, .55), 8px 0 22px rgba(0, 0, 0, .55);
+}
+[data-testid="stSidebar"][aria-expanded="true"] { width: 400px !important; min-width: 400px !important; max-width: 400px !important; }
+[data-testid="stSidebarContent"] { position: relative; }
+/* el lomo del cuaderno, con el título en letra manuscrita */
+[data-testid="stSidebarContent"]::before {
+  content: "La libreta de Holmes"; position: absolute; left: 0; top: 0; bottom: 0; width: 52px;
+  writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
+  font-family: var(--script); font-size: 2.3rem; color: var(--oro); opacity: .9; line-height: 52px;
+  border-left: 2px solid rgba(212, 175, 97, .35);
+  background: linear-gradient(270deg, rgba(0, 0, 0, .35), rgba(255, 255, 255, .02));
+  text-shadow: 0 1px 0 #000; pointer-events: none;
+}
+[data-testid="stSidebarUserContent"] { padding: 1.2rem 1.7rem 2rem 4.4rem !important; }
+[data-testid="stSidebarHeader"] { padding-left: 4.4rem; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] li { color: var(--crema); font-size: .95rem; line-height: 1.55; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] em { color: var(--crema-tenue); }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] strong { color: var(--oro-claro); }
+
+/* Insignia de latón con el modo */
+.insignia {
+  display: block; text-align: center; margin: .2rem 0 .5rem; padding: .45rem .8rem;
+  background: linear-gradient(180deg, #F6DE9E, #C99A45 55%, #9C7432);
+  color: #2C1E08; font-family: var(--texto); font-size: .98rem; border-radius: 20px;
+  box-shadow: inset 0 0 0 1px rgba(80, 55, 15, .6), inset 0 0 0 3px rgba(255, 238, 190, .45), 0 3px 8px rgba(0, 0, 0, .5);
+}
+.estado-caso { text-align: center; color: var(--crema-tenue); font-size: .85rem; font-style: italic; margin-bottom: .6rem; }
+
+/* Secciones como fichas con pestaña dorada */
+[data-testid="stSidebar"] [data-testid="stExpander"] { position: relative; overflow: visible; margin-bottom: .9rem; }
+[data-testid="stSidebar"] [data-testid="stExpander"] details {
+  background: #12100D; border: 1px solid rgba(212, 175, 97, .7) !important; border-radius: 3px !important;
+  box-shadow: inset 0 0 0 3px #12100D, inset 0 0 0 4px rgba(212, 175, 97, .25), 0 6px 14px rgba(0, 0, 0, .5);
+}
+[data-testid="stSidebar"] [data-testid="stExpander"]::after { /* pestaña */
+  content: ""; position: absolute; right: -15px; top: 12px; width: 13px; height: 46px; border-radius: 0 6px 6px 0;
+  background: linear-gradient(90deg, #7E5B22, #F3DC9A 45%, #B98B3C);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, .55);
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary {
+  font-family: var(--titulos) !important; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--oro-claro) !important; border-bottom: 1px solid rgba(212, 175, 97, .25);
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p { font-family: var(--titulos) !important; font-size: 1.02rem !important; color: var(--oro-claro) !important; }
+[data-testid="stSidebar"] [data-testid="stExpander"] summary [data-testid="stIconMaterial"] { color: var(--oro) !important; }
+[data-testid="stSidebar"] [data-testid="stExpanderDetails"] { padding-top: .6rem; }
+
+/* Campos y botones dentro de la libreta */
+[data-testid="stSidebar"] [data-baseweb="select"] > div,
+[data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea {
+  background: #0B0A08 !important; border-color: rgba(212, 175, 97, .45) !important; color: var(--crema) !important;
+  font-family: var(--texto) !important;
+}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { color: var(--crema-tenue) !important; font-style: italic; }
+[data-testid="stSidebar"] button {
+  background: transparent !important; border: 1px solid rgba(212, 175, 97, .55) !important; color: var(--oro-claro) !important;
+  font-family: var(--texto) !important;
+}
+[data-testid="stSidebar"] button:hover { border-color: var(--oro-claro) !important; box-shadow: 0 0 10px rgba(212, 175, 97, .3); }
+[data-testid="stSidebar"] button p { color: inherit !important; }
+/* Botón de acusar: sello de lacre */
+[data-testid="stSidebar"] [class*="st-key-FormSubmitter-acusacion"] button {
+  width: 100%; background: radial-gradient(circle at 30% 30%, #A8352A, #6A1612 65%, #3E0B09) !important;
+  border: 2px solid var(--oro) !important; color: var(--oro-claro) !important; font-weight: 700;
+  min-height: 44px; border-radius: 22px !important;
+}
+[data-testid="stSidebar"] [data-testid="stForm"] { border-color: rgba(212, 175, 97, .25); }
+[data-testid="stSidebar"] hr { border-color: rgba(212, 175, 97, .25); }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { font-size: .8rem; }
+
+/* El botón para abrir la libreta (sobre todo en el celular) */
+[data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapseButton"] button { color: var(--oro) !important; }
+
+/* ---------- Velas (decorativas, solo en pantallas grandes) ---------- */
+.velas { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.vela { position: absolute; width: 34px; }
+.vela .cuerpo { width: 34px; height: 120px; border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(90deg, #B9A27A, #F2E6C8 35%, #FFF8E6 50%, #D8C59C 80%, #9E8A62);
+  box-shadow: 0 0 30px rgba(255, 190, 100, .25); }
+.vela .cuerpo::before { content: ""; position: absolute; top: -4px; left: 0; right: 0; height: 10px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, #FFF6DD, #D6C190); }
+.vela .llama { position: absolute; left: 50%; top: -38px; width: 14px; height: 30px; margin-left: -7px;
+  border-radius: 50% 50% 50% 50% / 64% 64% 36% 36%;
+  background: radial-gradient(ellipse at 50% 75%, #FFFFFF 0, #FFE9A6 30%, #FFB347 65%, rgba(255, 120, 30, 0) 100%);
+  filter: blur(.4px); animation: parpadeo 3.2s ease-in-out infinite; transform-origin: 50% 100%; }
+.vela .halo { position: absolute; left: 50%; top: -110px; width: 220px; height: 220px; margin-left: -110px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 200, 110, .30), rgba(255, 160, 60, .08) 45%, transparent 70%); }
+/* en el margen derecho, por encima de la barra de escritura */
+.vela.der { right: 22px; bottom: 150px; }
+.vela.der2 { right: 64px; bottom: 150px; transform: scale(.74); transform-origin: bottom; }
+@media (max-width: 1560px) { .vela.der2 { display: none; } }
+@keyframes parpadeo { 0%, 100% { transform: scale(1) rotate(-1deg); } 50% { transform: scale(1.05, .95) rotate(1.5deg); } }
+@media (prefers-reduced-motion: reduce) { .vela .llama { animation: none; } }
+@media (max-width: 1360px) { .velas { display: none; } }
+
+/* ---------- Celular ---------- */
+@media (max-width: 640px) {
+  [data-testid="stMainBlockContainer"] { margin-top: 1rem; padding: 1.6rem 1rem 1.2rem; background-size: 54px, 54px, 54px, 54px, auto, 120% auto, auto, auto; }
+  [data-testid="stChatMessage"]:has([aria-label="Chat message from user"]) [data-testid="stChatMessageContent"] { max-width: 92%; }
+  .subtitulo-221b { font-size: 1rem; }
+  [data-testid="stChatInputTextArea"]::placeholder { font-size: 1.35rem; }
+}

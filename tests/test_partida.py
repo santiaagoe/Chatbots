@@ -7,11 +7,12 @@ from juego.cifrados import cifrar
 
 
 def caso_de_prueba() -> Caso:
-    sospechoso = lambda n: Sospechoso(nombre=n, ocupacion="mayordomo", relacion_con_victima="empleado",
+    sospechoso = lambda n: Sospechoso(nombre=n, ocupacion="mayordomo", relacion_con_victima="empleado", motivo_sospecha="tenía la llave",
                                       coartada="estaba en la cocina", secreto="debe dinero")
     return Caso(
         titulo="La aventura del reloj detenido", lugar="Kensington", fecha="marzo de 1895",
-        resumen="Un telegrama urgente.", victima=Persona(nombre="Lord Ashby", descripcion="anciano"),
+        resumen="Un telegrama urgente.", hechos_conocidos="Lo hallaron muerto en su estudio.",
+        escena_nombre="El estudio de Lord Ashby", victima=Persona(nombre="Lord Ashby", descripcion="anciano"),
         crimen="Fue envenenado.", sospechosos=[sospechoso("Arthur Pell"), sospechoso("Mary Stone")],
         culpable="Mary Ston", movil="herencia", metodo="arsénico en el té",
         pistas=[Pista(descripcion="taza", ubicacion="estudio", que_revela="veneno")],
@@ -25,7 +26,7 @@ def test_extraer_etiquetas():
                  "Coja su abrigo.\n[[MODO: b]]")
     e = partida.extraer_etiquetas(respuesta)
     assert e.modo == "B"
-    assert e.imagenes == ["a foggy alley, Victorian London"]
+    assert [i.descripcion for i in e.imagenes] == ["a foggy alley, Victorian London"]
     assert "[[" not in e.texto and "Coja su abrigo." in e.texto
 
 
@@ -70,3 +71,9 @@ def test_instruccion_no_filtra_mensajes_sin_resolver():
 
 def test_contexto_hora():
     assert partida.contexto_hora(datetime(2026, 10, 10, 23, 36)).endswith("23:36 (sábado)")
+
+
+def test_instruccion_sin_imagenes():
+    caso = reparar_caso(caso_de_prueba())
+    texto = partida.instruccion_sistema("P", "B", caso, [], False, 0, imagenes_activas=False)
+    assert "NO escribas [[IMAGEN" in texto

@@ -60,7 +60,7 @@ flowchart LR
     APP --> CIF[juego/cifrados.py<br/>10 cifrados]
     APP --> CASO[juego/caso.py<br/>caso en JSON]
     CASO --> G
-    APP -->|"[[IMAGEN: ...]]"| GI[Gemini<br/>imágenes]
+    APP -->|"[[IMAGEN: ...]]"| GI[Cloudflare FLUX<br/>o Gemini imágenes]
 ```
 
 **Principio de diseño:** la IA pone la voz y la historia; **el código controla las reglas**.
@@ -69,17 +69,20 @@ flowchart LR
 - **El caso se genera una sola vez en JSON** con esquema estricto y se le recuerda a Holmes en cada turno, por lo que la solución nunca cambia.
 - **La aplicación y Holmes se comunican con etiquetas**: la app le envía `[CASO SECRETO]`, `[PISTA CIFRADA]`, `[RESULTADO]`…, y Holmes le pide cosas con `[[IMAGEN: …]]` o `[[MODO: B]]`, que la app quita antes de mostrar el mensaje.
 - **El índice MCP** ([`indice_mcp/servidor.py`](indice_mcp/servidor.py)) expone dos herramientas (`buscar_en_mis_archivos`, `listar_relatos`) con búsqueda BM25 sobre los relatos. Un puente propio declara esas herramientas a Gemini y ejecuta las llamadas por el protocolo MCP. El servidor también funciona solo (`python indice_mcp/servidor.py`) con cualquier cliente MCP.
+- **Imágenes gratis**: el nivel gratuito de Gemini no incluye imágenes, así que la app puede usar **Cloudflare Workers AI** (FLUX.1 [schnell], cuota diaria gratuita). Si no hay cuota de imágenes, Holmes describe las escenas con palabras y el juego sigue.
+- **Resistencia a fallos**: si Gemini está saturado (503), se reintenta y luego responde un modelo de respaldo.
 - **Protecciones de gasto**: máximo 3 imágenes por caso y un límite de mensajes por sesión.
 
 ### Estructura
 
 ```
-sherlock-chatbot/
+Chatbots/
 ├── app.py                    # interfaz de chat (Streamlit)
 ├── personaje/
 │   └── prompt_sistema.md     # la personalidad de Holmes
 ├── juego/
 │   ├── motor.py              # conexión con Gemini + puente MCP
+│   ├── imagenes_cloudflare.py # imágenes gratis con Cloudflare Workers AI
 │   ├── caso.py               # caso secreto (JSON) y juicio del móvil
 │   ├── cifrados.py           # los 10 cifrados
 │   └── partida.py            # reglas: etiquetas, pistas, puntaje
@@ -89,8 +92,11 @@ sherlock-chatbot/
 ├── scripts/
 │   └── descargar_libros.py
 ├── tests/                    # pruebas automáticas (pytest)
-├── .streamlit/config.toml    # tema victoriano
+├── estilo/tema.css           # diseño: marco dorado, libreta de cuero, sellos de lacre
+├── static/                   # fondo de la calle de Londres y medallón de Holmes
+├── .streamlit/config.toml    # tema oscuro y archivos estáticos
 ├── requirements.txt
+├── LICENSE                   # licencia MIT
 └── .env.example
 ```
 
@@ -101,8 +107,8 @@ sherlock-chatbot/
 Necesitas Python 3.10 o superior y una clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey).
 
 ```bash
-git clone https://github.com/TU_USUARIO/sherlock-chatbot.git
-cd sherlock-chatbot
+git clone https://github.com/TU_USUARIO/Chatbots.git
+cd Chatbots
 
 python -m venv .venv
 # Windows: .venv\Scripts\activate    ·    macOS/Linux: source .venv/bin/activate
@@ -110,6 +116,7 @@ pip install -r requirements.txt
 
 cp .env.example .env          # en Windows: copy .env.example .env
 # edita .env y pon tu GEMINI_API_KEY
+# (opcional) CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN para imágenes gratis
 
 python scripts/descargar_libros.py   # opcional: llena el índice de Holmes
 streamlit run app.py
@@ -129,6 +136,7 @@ Las pruebas verifican que cada cifrado se pueda descifrar, el servidor MCP, el p
 
 - **Python** + **Streamlit** (interfaz)
 - **Google Gemini** (`google-genai`): conversación, salida JSON estructurada e imágenes
+- **Cloudflare Workers AI** (FLUX.1 [schnell]): imágenes en el nivel gratuito
 - **Model Context Protocol** con **FastMCP** (índice de los libros)
 - **pytest**
 
@@ -137,3 +145,7 @@ Las pruebas verifican que cada cifrado se pueda descifrar, el servidor MCP, el p
 - Personajes y relatos de **Sir Arthur Conan Doyle** (dominio público).
 - Textos originales de [Project Gutenberg](https://www.gutenberg.org/).
 - Proyecto creado para el concurso de ChatBots IA del CaDCC.
+
+## Licencia
+
+Código bajo licencia [MIT](LICENSE) © 2026 Santiago Espinoza Correa. Los relatos de Conan Doyle incluidos en `indice_mcp/textos/` son de dominio público.

@@ -17,11 +17,12 @@ def png_de_prueba() -> bytes:
 
 
 def caso_falso() -> Caso:
-    s = lambda n: Sospechoso(nombre=n, ocupacion="criado", relacion_con_victima="empleado",
+    s = lambda n: Sospechoso(nombre=n, ocupacion="criado", relacion_con_victima="empleado", motivo_sospecha="tenía la llave",
                              coartada="dormía", secreto="juega a las cartas")
     return Caso(
         titulo="La aventura del candelabro torcido", lugar="Belgravia", fecha="enero de 1895",
-        resumen="Llega un telegrama.", victima=Persona(nombre="Sir Hugh", descripcion="coleccionista"),
+        resumen="Llega un telegrama.", hechos_conocidos="El rubí desapareció de la vitrina.",
+        escena_nombre="El salón de Sir Hugh", victima=Persona(nombre="Sir Hugh", descripcion="coleccionista"),
         crimen="Robo de un rubí.", sospechosos=[s("Tom Briggs"), s("Ada Lowe"), s("Ned Carr")],
         culpable="Ada Lowe", movil="deudas de juego", metodo="duplicó la llave",
         pistas=[Pista(descripcion="cera en la cerradura", ubicacion="vitrina", que_revela="molde")],
@@ -43,7 +44,10 @@ def app(monkeypatch):
         if "opción B" in ultimo:
             return "¡Excelente! Buscaré el expediente.\n[[MODO: B]]"
         if "[INICIO CASO]" in ultimo:
+            # Pide imagen a propósito: en la presentación la app debe ignorarla
             return "El caso del candelabro.\n[[IMAGEN: a dark drawing room]]"
+        if "escena" in ultimo.lower():
+            return "El salón está en penumbra; hay cera en la cerradura.\n[[IMAGEN: ESCENA]]\n[[PISTA: 1]]"
         return "Interesante. Usted escribe de noche."
 
     def generar_json(self, instruccion, esquema, temperatura=1.0):
@@ -67,11 +71,15 @@ def test_partida_completa(app):
     boton_b.click().run()  # elige el camino B desde la libreta
     assert at.session_state.modo == "B"
     assert at.session_state.caso.titulo.startswith("La aventura")
-    assert at.session_state.imagenes_usadas == 1
+    assert at.session_state.imagenes_usadas == 0  # nunca en la presentación
     assert "[CASO SECRETO]" in respuestas[-1]
 
-    # Tras dos mensajes en el caso aparece el primer mensaje cifrado
+    # Al llegar a la escena: la imagen se dibuja y la pista queda anotada
     at.chat_input[0].set_value("Vamos a la escena").run()
+    assert at.session_state.imagenes_usadas == 1 and at.session_state.escena_dibujada
+    assert at.session_state.pistas_anotadas == [1]
+
+    # Tras dos mensajes en el caso aparece el primer mensaje cifrado
     at.chat_input[0].set_value("Examino la vitrina").run()
     pista = at.session_state.pistas[0]
     assert pista.estado == "activa"

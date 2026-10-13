@@ -1,10 +1,14 @@
 [theme]
-base = "light"
-primaryColor = "#7a4a1e"
-backgroundColor = "#f4ecd8"
-secondaryBackgroundColor = "#e8dcc0"
-textColor = "#2b1d0e"
+base = "dark"
+primaryColor = "#D4AF61"
+backgroundColor = "#0E0F0D"
+secondaryBackgroundColor = "#1C1813"
+textColor = "#E8DCC0"
 font = "serif"
+
+[server]
+# Sirve la carpeta static/ (fondo de la calle y avatar de Holmes) en app/static/
+enableStaticServing = true
 
 [client]
 toolbarMode = "minimal"
