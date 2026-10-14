@@ -1,13 +1,13 @@
 [theme]
-base = "dark"
-primaryColor = "#D4AF61"
-backgroundColor = "#0E0F0D"
-secondaryBackgroundColor = "#1C1813"
-textColor = "#E8DCC0"
+base = "light"
+primaryColor = "#8E1F1A"
+backgroundColor = "#4A2A18"
+secondaryBackgroundColor = "#EFE4C9"
+textColor = "#2B1E12"
 font = "serif"
 
 [server]
-# Sirve la carpeta static/ (fondo de la calle y avatar de Holmes) en app/static/
+# Sirve la carpeta static/ (foto de la calle y medallón de Holmes) en app/static/
 enableStaticServing = true
 
 [client]

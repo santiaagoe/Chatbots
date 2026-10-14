@@ -7,6 +7,7 @@ Ejecutar:  streamlit run app.py
 from __future__ import annotations
 
 import os
+import random
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -15,8 +16,9 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 from dotenv import load_dotenv
 
-from juego import cifrados, fichas, partida
-from juego.caso import evaluar_movil, generar_caso
+from juego import cifrados, descifrador, fichas, partida, relato
+from juego.caso import evaluar_movil, generar_caso, generar_opciones
+from juego.caso_muestra import CASOS_MUESTRA, buscar_muestra, elegir_muestra
 from juego.imagenes_cloudflare import ErrorCloudflare
 from juego.motor import Motor, imagen_no_disponible, leer_configuracion, sin_cuota
 from juego.partida import PistaCifrada
@@ -35,12 +37,10 @@ st.set_page_config(page_title="221B Baker Street", page_icon="🔍", layout="cen
 TEMA = (RAIZ / "estilo" / "tema.css").read_text(encoding="utf-8")
 AVATAR_HOLMES = str(RAIZ / "static" / "avatar_holmes.png")
 st.markdown(f"<style>{TEMA}</style>", unsafe_allow_html=True)
-st.markdown(fichas.ESTILOS, unsafe_allow_html=True)
-st.markdown(  # velas decorativas; el CSS las oculta en pantallas pequeñas
+st.markdown(  # vela decorativa del escritorio; el CSS la oculta en pantallas pequeñas
     '<div class="velas" aria-hidden="true">'
-    '<div class="vela der2"><div class="halo"></div><div class="llama"></div><div class="cuerpo"></div></div>'
-    '<div class="vela der"><div class="halo"></div><div class="llama"></div><div class="cuerpo"></div></div>'
-    "</div>", unsafe_allow_html=True)
+    '<div class="vela der"><div class="halo"></div><div class="llama"></div><div class="cuerpo"></div>'
+    '<div class="base"></div></div></div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +64,12 @@ def estado_inicial() -> dict:
         "escena_dibujada": False,
         "acusacion_sugerida": False,
         "abrir_acusacion": False,  # abre el panel ⚖️ cuando el visitante intenta acusar
+        "opciones_caso": None,     # los tres expedientes que se ofrecen en el modo B
+        "notas_a": [],             # datos que Holmes anota en el modo A
+        "acusacion_hecha": None,   # lo que acusó el visitante: culpable, móvil y si acertó
+        "mensajes_en_a": 0,        # mensajes del visitante contando su caso (modo A)
+        "relato_escrito": False,   # Watson ya escribió el relato de este caso
+        "desafio_pendiente": None, # mensaje cifrado del visitante que Holmes no pudo leer (espera la clave)
     }
 
 
@@ -74,13 +80,25 @@ st.session_state.setdefault("ultimo_medio", None)
 S = st.session_state
 
 
-def reiniciar(conservar_titulos: bool = True) -> None:
+def reiniciar(conservar_titulos: bool = True, conservar_mensajes: bool = False) -> None:
     titulos = S.titulos_jugados if conservar_titulos else []
     enviados = S.enviados  # el límite de mensajes no se reinicia con el botón
+    mensajes = S.mensajes
     for clave, valor in estado_inicial().items():
         S[clave] = valor
     S.titulos_jugados = titulos
     S.enviados = enviados
+    if conservar_mensajes:
+        S.mensajes = mensajes
+
+
+def cambiar_camino() -> None:
+    """Vuelve a la elección A/B sin borrar la conversación."""
+    reiniciar(conservar_mensajes=True)
+    nota_oculta("[CONTEXTO] El visitante decidió cambiar de camino. El caso anterior quedó cerrado.")
+    S.mensajes.append({"rol": "model", "oculto": False, "camino": True,
+                       "texto": "*Holmes cierra la carpeta y la devuelve a la repisa.* "
+                                "Muy bien. ¿Qué camino prefiere ahora, colega?"})
 
 
 # ---------------------------------------------------------------------------
@@ -161,8 +179,10 @@ def turno_holmes(adjuntos: dict | None = None, permitir_imagen: bool = True) -> 
         PROMPT, S.modo, S.caso, S.pistas, S.terminado, S.imagenes_usadas, S.imagenes_activas,
         S.pistas_anotadas, S.escena_dibujada)
     try:
-        with st.spinner("Holmes medita, la pipa entre los dientes…"):
-            respuesta = motor.responder(S.mensajes[-40:], instruccion)
+        ultimo = next((m["texto"] for m in reversed(S.mensajes) if m["rol"] == "user" and not m.get("oculto")), "")
+        with st.spinner(partida.frase("pensar")):
+            respuesta = motor.responder(S.mensajes[-40:], instruccion,
+                                        usar_indice=partida.necesita_indice(ultimo))
         S.ultimo_modelo = motor.ultimo_modelo
     except Exception as error:  # noqa: BLE001
         S.mensajes.append({
@@ -191,8 +211,14 @@ def turno_holmes(adjuntos: dict | None = None, permitir_imagen: bool = True) -> 
     if etiquetas.imagenes and puede_dibujar:
         dibujar_imagen(etiquetas.imagenes[0], mensaje)
 
+    if S.modo == "A":
+        for nota in etiquetas.notas:
+            if nota and nota not in S.notas_a:
+                S.notas_a.append(nota)
+        S.notas_a = S.notas_a[-20:]
+
     S.mensajes.append(mensaje)
-    if etiquetas.modo and S.modo is None:
+    if etiquetas.modo and S.modo is None:  # respaldo: la app ya detecta la elección por su cuenta
         elegir_modo(etiquetas.modo)
     return mensaje
 
@@ -206,7 +232,7 @@ def dibujar_imagen(pedido: partida.PedidoImagen, mensaje: dict) -> None:
     else:
         descripcion, pie, es_escena = pedido.descripcion, pedido.pie, False
     try:
-        with st.spinner("Un dibujante de la Strand Magazine bosqueja la escena…"):
+        with st.spinner(partida.frase("dibujo")):
             imagen = motor.generar_imagen(f"{descripcion}. {ESTILO_IMAGEN}")
         if imagen:
             datos, mime = imagen[0], imagen[1]
@@ -221,19 +247,64 @@ def dibujar_imagen(pedido: partida.PedidoImagen, mensaje: dict) -> None:
 
 def elegir_modo(modo: str) -> None:
     S.modo = modo
-    if modo != "B":
-        return
+    if modo == "B":
+        ofrecer_expedientes()
+
+
+def ofrecer_expedientes() -> None:
+    """Holmes pone tres expedientes sobre la mesa: dos nuevos (una sola consulta a Gemini) y uno de muestra.
+
+    Si Gemini falla, igual queda el caso de muestra para jugar.
+    """
+    error_generacion = None
+    muestra = elegir_muestra(S.dificultad, S.titulos_jugados)
     try:
-        medio = partida.elegir_medio(S.ultimo_medio)
-        with st.spinner("Holmes revuelve el montón de cartas sobre la repisa…"):
-            caso = generar_caso(motor, S.dificultad, S.titulos_jugados,
-                                medio=partida.MEDIOS[medio]["descripcion"])
+        with st.spinner(partida.frase("expedientes")):
+            opciones = generar_opciones(motor, S.dificultad, S.titulos_jugados, reservado=muestra.tema)
     except Exception as error:  # noqa: BLE001
-        S.modo = None
+        opciones, error_generacion = [], error
+    opciones = opciones + [muestra.opcion.model_copy()]
+    for m in S.mensajes:  # una oferta anterior ya no se puede elegir
+        if m.get("expedientes") and m.get("elegido") is None:
+            m["elegido"] = -1
+    S.opciones_caso = opciones
+    resumen = "; ".join(f"{i + 1}) «{o.titulo}», {o.tipo_crimen} en {o.lugar}" for i, o in enumerate(opciones))
+    mensaje = {
+        "rol": "model", "oculto": False, "texto": random.choice(partida.PRESENTA_EXPEDIENTES),
+        "para_ia": f"(Muestras al visitante expedientes para elegir: {resumen}.)",
+        "expedientes": [o.model_dump() for o in opciones],
+    }
+    if error_generacion is not None:
+        mensaje["texto"] = ("*Holmes rebusca en vano: la Sra. Hudson ha ordenado sus papeles.* «Solo encuentro "
+                            "este expediente, colega, pero le aseguro que es de lo más singular.»")
+        mensaje["error"] = f"No se pudieron crear casos nuevos. {explicar_error(error_generacion)}"
+    S.mensajes.append(mensaje)
+
+
+def abrir_expediente(indice: int) -> None:
+    """El visitante eligió un expediente: se genera el caso completo y se presenta."""
+    opcion = S.opciones_caso[indice]
+    S.enviados += 1
+    S.mensajes.append({"rol": "user", "oculto": False, "texto": f"Abro el expediente «{opcion.titulo}»."})
+    try:
+        if opcion.muestra:  # caso escrito a mano: no gasta consultas y siempre funciona
+            muestra = buscar_muestra(opcion.titulo) or CASOS_MUESTRA[1]
+            medio, caso = muestra.medio, muestra.crear()
+        else:
+            medio = partida.elegir_medio(S.ultimo_medio)
+            with st.spinner(partida.frase("caso")):
+                caso = generar_caso(motor, S.dificultad, S.titulos_jugados,
+                                    medio=partida.MEDIOS[medio]["descripcion"], semilla=opcion)
+    except Exception as error:  # noqa: BLE001
         S.mensajes.append({"rol": "model", "oculto": False, "error": explicar_error(error),
-                           "texto": "*Holmes busca el expediente, pero la Sra. Hudson parece haberlo "
-                                    "ordenado.* ¡Inaceptable! Elija de nuevo en un momento."})
+                           "texto": "*Holmes abre la carpeta y frunce el ceño: faltan páginas.* "
+                                    "Inténtelo de nuevo en un momento, o abra el caso de muestra, "
+                                    "que está completo."})
         return
+    for m in S.mensajes:  # marca la carpeta elegida y retira los botones
+        if m.get("expedientes") and m.get("elegido") is None:
+            m["elegido"] = indice
+    S.opciones_caso = None
     S.caso = caso
     S.medio = S.ultimo_medio = medio
     S.titulos_jugados.append(caso.titulo)
@@ -253,6 +324,18 @@ def procesar_mensaje(texto: str) -> None:
     S.mensajes.append({"rol": "user", "texto": texto, "oculto": False,
                        "para_ia": f"{partida.contexto_hora(ahora)}\n{texto}"})
     adjuntos = {}
+    contaba_su_caso = S.modo == "A"  # el mensaje con el que elige el camino A no cuenta
+    if S.modo is None:
+        modo = partida.detectar_modo(texto)
+        if modo == "B":  # Holmes saca los expedientes sin gastar una consulta extra
+            elegir_modo("B")
+            return
+        if modo == "A":
+            S.modo = "A"
+    if responder_desafio_en_chat(texto):
+        return
+    if contaba_su_caso:
+        S.mensajes_en_a += 1
     if S.modo == "B" and S.caso is not None and not S.terminado:
         S.mensajes_en_caso += 1
         indice = partida.pista_a_revelar(S.pistas, S.mensajes_en_caso)
@@ -279,6 +362,123 @@ def procesar_mensaje(texto: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# El visitante desafía a Holmes con un mensaje cifrado
+# ---------------------------------------------------------------------------
+
+def textos_visibles() -> list[str]:
+    return [m["texto"] for m in S.mensajes if not m.get("oculto") and m.get("texto")]
+
+
+def analizar_desafio(desafio: descifrador.Desafio, clave: str | None = None) -> descifrador.Hallazgo:
+    with st.spinner(partida.frase("descifrar")):
+        return descifrador.analizar_desafio(
+            desafio, descifrador.claves_de_conversacion(textos_visibles()[:-1]), clave_dada=clave)
+
+
+def resolver_desafio(desafio: descifrador.Desafio, hallazgo: descifrador.Hallazgo) -> None:
+    """El código ya descifró (Holmes no se equivoca); Holmes lo cuenta con su voz."""
+    indice = None
+    if S.modo == "B" and S.caso is not None and not S.terminado:
+        indice = descifrador.es_mensaje_del_caso(hallazgo, desafio.cifrado, S.pistas)
+    nota_oculta(descifrador.instruccion_para_holmes(hallazgo, indice))
+    adjuntos = {}
+    if indice is None:
+        S.desafio_pendiente = vars(desafio) if hallazgo.tipo is None else None
+        if hallazgo.tipo is not None:
+            adjuntos["descifrado_html"] = fichas.nota_descifrada(hallazgo.tipo, hallazgo.nombre, hallazgo.mensaje,
+                                                                  hallazgo.detalle)
+    turno_holmes(adjuntos, permitir_imagen=False)
+
+
+def responder_desafio_en_chat(texto: str) -> bool:
+    """«Descifre esto: …», Morse pegado en el chat o la clave de un desafío pendiente. True si lo atendió."""
+    mensaje = descifrador.extraer_desafio(texto)
+    if mensaje:
+        desafio = descifrador.Desafio(mensaje)
+        hallazgo = analizar_desafio(desafio)
+        if hallazgo.tipo == "sin_cifrar":  # «el mensaje cifrado: no lo entiendo» es conversación, no un desafío
+            return False
+        resolver_desafio(desafio, hallazgo)
+        return True
+    clave = descifrador.extraer_clave(texto) if S.desafio_pendiente else None
+    if clave:
+        desafio = descifrador.Desafio(**S.desafio_pendiente)
+        resolver_desafio(desafio, analizar_desafio(desafio, clave))
+        return True
+    return False
+
+
+def entregar_desafio(texto: str, tipo: str, clave: str) -> None:
+    """Desde el formulario: la app cifra el mensaje (si hace falta) y se lo entrega a Holmes."""
+    desafio = descifrador.cifrar_desafio(texto, tipo, clave)
+    S.enviados += 1
+    S.mensajes.append({
+        "rol": "user", "oculto": False, "texto": "Le dejo un mensaje cifrado, señor Holmes. ¿Sabrá leerlo?",
+        "desafio_html": fichas.desafio_html(desafio.cifrado, desafio.svg),
+        "para_ia": "(El visitante te entrega un mensaje cifrado para que lo descifres: "
+                   f"{'[figuras danzantes]' if desafio.svg else desafio.cifrado})",
+    })
+    resolver_desafio(desafio, analizar_desafio(desafio))
+
+
+def formulario_desafio(lugar: str) -> None:
+    """Escribir un mensaje y elegir cómo cifrarlo; Holmes no sabe cuál se eligió."""
+    with st.form(f"desafio_{lugar}", clear_on_submit=True):
+        texto = st.text_area("Su mensaje secreto", max_chars=200, key=f"desafio_texto_{lugar}",
+                             placeholder="Escríbalo en claro y yo lo cifro, o péguelo ya cifrado")
+        tipo = st.selectbox("¿Cómo lo cifro?", descifrador.TIPOS_DESAFIO, key=f"desafio_tipo_{lugar}",
+                            format_func=descifrador.NOMBRES_DESAFIO.get)
+        clave = st.text_input("Palabra clave (solo para Vigenère)", key=f"desafio_clave_{lugar}", max_chars=20)
+        enviar = st.form_submit_button("Entregárselo a Holmes")
+    st.caption("Holmes no sabrá qué código eligió: tendrá que descubrirlo.")
+    if enviar:
+        if not cifrados.normalizar(texto) and not texto.strip():
+            st.warning("Escriba primero el mensaje.")
+            return
+        try:
+            entregar_desafio(texto, tipo, clave)
+        except ValueError:
+            st.warning("Ese mensaje no tiene letras que cifrar.")
+            return
+        st.rerun()
+
+
+# ---------------------------------------------------------------------------
+# El relato de Watson
+# ---------------------------------------------------------------------------
+
+def puede_pedir_relato() -> bool:
+    if S.relato_escrito or S.enviados >= MAX_MENSAJES:
+        return False
+    if S.modo == "B":
+        return S.caso is not None and S.terminado
+    return S.modo == "A" and S.mensajes_en_a >= 3
+
+
+def pedir_relato() -> None:
+    S.enviados += 1
+    S.mensajes.append({"rol": "user", "oculto": False, "texto": "✒️ ¿Y si Watson escribiera este caso?"})
+    if S.modo == "B":
+        datos = relato.datos_modo_b(S.caso, S.acusacion_hecha, S.pistas, S.pistas_anotadas, S.puntaje_final)
+        titulo = S.caso.titulo
+    else:
+        datos, titulo = relato.datos_modo_a(S.notas_a), None
+    try:
+        with st.spinner(partida.frase("relato")):
+            escrito = relato.generar_relato(motor, datos, S.mensajes, titulo)
+    except Exception as error:  # noqa: BLE001
+        S.mensajes.append({"rol": "model", "oculto": False, "error": explicar_error(error),
+                           "para_ia": "(El relato de Watson no llegó.)",
+                           "texto": "*Holmes mira por la ventana.* «El mensajero de Watson se retrasa. "
+                                    "Pídamelo de nuevo en un momento.»"})
+        return
+    S.relato_escrito = True
+    S.mensajes.append({"rol": "model", "oculto": False, "texto": random.choice(partida.ENTREGA_RELATO),
+                       "para_ia": f"(Watson envió su relato «{escrito.titulo}» y el visitante lo está leyendo.)",
+                       "relato": escrito.model_dump()})
+
+
+# ---------------------------------------------------------------------------
 # Dibujo de los mensajes
 # ---------------------------------------------------------------------------
 
@@ -292,10 +492,40 @@ def mostrar_nota_cifrada(indice: int) -> None:
     )
 
 
-def mostrar_mensaje(m: dict) -> None:
+def mostrar_expedientes(m: dict) -> None:
+    """Las tres carpetas sobre el tablero; solo la oferta vigente tiene botones."""
+    vigente = S.modo == "B" and S.caso is None and S.opciones_caso is not None and m.get("elegido") is None
+    columnas = st.columns(len(m["expedientes"]))
+    for i, (columna, opcion) in enumerate(zip(columnas, m["expedientes"])):
+        with columna:
+            st.markdown(fichas.carpeta_expediente(opcion, elegida=m.get("elegido") == i,
+                                                  apagada=m.get("elegido") not in (None, i)),
+                        unsafe_allow_html=True)
+            if vigente and st.button("Abrir este expediente", key=f"expediente_{i}", width="stretch"):
+                abrir_expediente(i)
+                st.rerun()
+    if vigente and st.button("Ver otros expedientes", key="otros_expedientes"):
+        S.enviados += 1
+        ofrecer_expedientes()
+        st.rerun()
+
+
+def mostrar_mensaje(m: dict, indice: int = 0) -> None:
     avatar = AVATAR_HOLMES if m["rol"] == "model" else "user"
     with st.chat_message("assistant" if m["rol"] == "model" else "user", avatar=avatar):
         st.markdown(m["texto"])
+        if m.get("desafio_html"):
+            st.markdown(m["desafio_html"], unsafe_allow_html=True)
+        if m.get("descifrado_html"):
+            st.markdown(m["descifrado_html"], unsafe_allow_html=True)
+        if m.get("relato"):
+            st.markdown(fichas.pagina_strand(m["relato"]), unsafe_allow_html=True)
+            escrito = relato.RelatoWatson(**m["relato"])
+            st.download_button("Descargar el relato", relato.relato_como_texto(escrito),
+                               file_name=relato.nombre_archivo(escrito), mime="text/plain",
+                               key=f"descargar_relato_{indice}", icon=":material/download:", on_click="ignore")
+        if m.get("expedientes"):
+            mostrar_expedientes(m)
         if m.get("ficha_html"):
             st.markdown(m["ficha_html"], unsafe_allow_html=True)
         for imagen in m.get("imagenes", []):
@@ -308,6 +538,8 @@ def mostrar_mensaje(m: dict) -> None:
             mostrar_nota_cifrada(m["pista"])
         if m.get("pistas_html"):
             st.markdown(m["pistas_html"], unsafe_allow_html=True)
+        if m.get("hilo_html"):
+            st.markdown(m["hilo_html"], unsafe_allow_html=True)
         if m.get("guia"):
             st.markdown(fichas.GUIA, unsafe_allow_html=True)
         if m.get("aviso_acusacion"):
@@ -329,8 +561,9 @@ def panel_pistas() -> None:
     for i, pista in enumerate(S.pistas):
         if pista.estado == "oculta":
             continue
-        with st.sidebar.expander(f"Mensaje cifrado {i + 1}", expanded=pista.estado == "activa",
-                                 icon=":material/description:"):
+        nota = st.sidebar.container(key=f"nota_cifrado_{i}")
+        with nota.expander(f"Mensaje cifrado {i + 1}", expanded=pista.estado == "activa",
+                           icon=":material/description:"):
             if pista.estado != "activa":
                 resultado = "✅ Resuelto" if pista.estado == "resuelta" else "🏳️ Se rindió"
                 st.markdown(f"{resultado} · **{pista.cifrado.nombre}**  \n«{pista.cifrado.mensaje}» "
@@ -346,6 +579,8 @@ def panel_pistas() -> None:
             ayuda = col1.button(f"Pedir pista ({pista.ayudas}/3)", key=f"ayuda_{i}",
                                 disabled=pista.ayudas >= 3)
             rendirse = col2.button("Rendirse", key=f"rendirse_{i}")
+            if pista.ayudas:
+                st.markdown(fichas.nota_adhesiva(pista.cifrado.pistas[pista.ayudas - 1]), unsafe_allow_html=True)
 
             if enviar:
                 tipo_bien, texto_bien = pista.proponer(tipo, texto)
@@ -381,8 +616,8 @@ def panel_pistas() -> None:
 
 def panel_acusacion() -> None:
     caso = S.caso
-    with st.sidebar.expander("Acusación final", expanded=S.abrir_acusacion or S.terminado,
-                             icon=":material/balance:"):
+    # st.expander (no st.sidebar.expander) para que quede dentro de la nota de papel que lo envuelve
+    with st.expander("Acusación final", expanded=S.abrir_acusacion or S.terminado, icon=":material/balance:"):
         if S.terminado:
             st.markdown(f"Culpable: **{caso.culpable}**  \nMóvil: {caso.movil}")
             return
@@ -395,7 +630,7 @@ def panel_acusacion() -> None:
             S.mensajes.append({"rol": "user", "oculto": False,
                                "texto": f"⚖️ Acuso a **{culpable}**. Móvil: {movil}"})
             try:
-                with st.spinner("Holmes cierra los ojos y junta las yemas de los dedos…"):
+                with st.spinner(partida.frase("juicio")):
                     veredicto = evaluar_movil(motor, caso, movil)
                 movil_bien, comentario = veredicto.movil_correcto, veredicto.comentario
             except Exception:  # noqa: BLE001
@@ -405,52 +640,84 @@ def panel_acusacion() -> None:
             S.puntaje_final = (puntos_pistas + partida.PUNTOS_CULPABLE * culpable_bien
                                + partida.PUNTOS_MOVIL * movil_bien)
             S.terminado = True
+            S.acusacion_hecha = {"culpable": culpable, "movil": movil, "culpable_bien": culpable_bien,
+                           "movil_bien": movil_bien}
             nota_oculta(
                 f"[RESULTADO] ACUSACIÓN FINAL. Culpable propuesto: {culpable} "
                 f"({'CORRECTO' if culpable_bien else 'INCORRECTO'}). Móvil "
                 f"{'CORRECTO' if movil_bien else 'INCORRECTO'} ({comentario}). Puntaje final: "
                 f"{S.puntaje_final}. El caso ha terminado: revela la solución completa con tu "
                 "razonamiento, como en el final de tus relatos. [/RESULTADO]")
-            turno_holmes()
+            # El tablero con el hilo rojo se arma ahora y queda guardado en el mensaje (no depende de Gemini)
+            turno_holmes({"hilo_html": fichas.hilo_rojo(caso, S.pistas_anotadas, culpable)})
             st.rerun()
 
 
+def boton_cambiar_camino() -> None:
+    if st.button("Cambiar de camino", icon=":material/alt_route:", width="stretch", key="cambiar_camino",
+                 help="Vuelve a elegir entre traer un caso o ayudar a Holmes, sin borrar la conversación."):
+        cambiar_camino()
+        st.rerun()
+
+
 with st.sidebar:
+    st.markdown('<div class="libreta-pinza" aria-hidden="true"></div>'
+                '<div class="libreta-titulo">La libreta<br>de Holmes</div>', unsafe_allow_html=True)
     if S.modo is None:
         st.markdown('<div class="insignia">Baker Street, 221B</div>', unsafe_allow_html=True)
-        S.dificultad = st.select_slider("Dificultad de los casos", cifrados.DIFICULTADES, value=S.dificultad)
-        if S.mensajes:
-            st.caption("Elija su camino:")
-            if st.button("A · Traigo un caso", icon=":material/search:", width="stretch"):
-                procesar_mensaje("Elijo la opción A: le traigo un caso.")
-                st.rerun()
-            if st.button("B · Ayudar a Holmes", icon=":material/person_search:", width="stretch"):
-                procesar_mensaje("Elijo la opción B: quiero ayudarle con su caso.")
-                st.rerun()
+        with st.container(key="nota_camino"):
+            st.markdown("**Elija su camino**")
+            S.dificultad = st.select_slider("Dificultad de los casos", cifrados.DIFICULTADES, value=S.dificultad)
+            if S.mensajes:
+                if st.button("A · Traigo un caso", icon=":material/search:", width="stretch", key="lateral_A"):
+                    procesar_mensaje("Elijo la opción A: le traigo un caso.")
+                    st.rerun()
+                if st.button("B · Ayudar a Holmes", icon=":material/person_search:", width="stretch",
+                             key="lateral_B"):
+                    procesar_mensaje("Elijo la opción B: quiero ayudarle con su caso.")
+                    st.rerun()
+            else:
+                st.caption("Salude a Holmes en el chat para empezar.")
     elif S.modo == "A":
-        st.markdown('<div class="insignia">Modo A · Usted trae el caso</div>', unsafe_allow_html=True)
+        st.markdown('<div class="insignia">Modo A • Usted trae el caso</div>', unsafe_allow_html=True)
+        with st.container(key="nota_notas"):
+            with st.expander("Notas del caso", expanded=True, icon=":material/edit_note:"):
+                st.markdown(fichas.notas_markdown(S.notas_a))
+        boton_cambiar_camino()
     else:
-        st.markdown(f'<div class="insignia">Modo B · Dificultad {escape(S.dificultad)}</div>',
+        st.markdown(f'<div class="insignia">Modo B • Dificultad {escape(S.dificultad)}</div>',
                     unsafe_allow_html=True)
-        if S.caso:
+        if S.caso is None:
+            with st.container(key="nota_eleccion"):
+                st.markdown("**Elija un expediente**")
+                st.caption("Holmes dejó tres carpetas sobre el tablero. Abra la que más le intrigue.")
+        else:
             puntos = S.puntaje_final if S.terminado else sum(p.puntos for p in S.pistas)
             imagenes = (f"imágenes {S.imagenes_usadas} de {partida.MAX_IMAGENES_POR_CASO}" if S.imagenes_activas
                         else "imágenes desactivadas")
             st.markdown(f'<div class="estado-caso">Puntaje {puntos}, {imagenes}</div>', unsafe_allow_html=True)
+            with st.container(key="nota_expediente"):
+                with st.expander("Expediente", expanded=True, icon=":material/folder_open:"):
+                    st.markdown(fichas.expediente_markdown(S.caso, S.pistas_anotadas))
+            with st.container(key="nota_sospechosos"):
+                with st.expander("Sospechosos", expanded=True, icon=":material/groups:"):
+                    st.markdown(fichas.sospechosos_markdown(S.caso))
+            panel_pistas()
+            with st.container(key="nota_acusacion"):
+                panel_acusacion()
+            if S.terminado and st.button("Nuevo caso", icon=":material/mail:", width="stretch", key="nuevo_caso"):
+                reiniciar()
+                st.rerun()
+        boton_cambiar_camino()
 
-    if S.modo == "B" and S.caso:
-        with st.expander("Expediente", expanded=True, icon=":material/folder_open:"):
-            st.markdown(fichas.expediente_markdown(S.caso, S.pistas_anotadas))
-        with st.expander("Sospechosos", expanded=True, icon=":material/groups:"):
-            st.markdown(fichas.sospechosos_markdown(S.caso))
-        panel_pistas()
-        panel_acusacion()
-        if S.terminado and st.button("Nuevo caso", icon=":material/mail:", width="stretch"):
-            reiniciar()
-            st.rerun()
-
+    en_caso = S.modo == "B" and S.caso is not None and not S.terminado  # durante un caso, la libreta es del caso
+    if S.mensajes and S.enviados < MAX_MENSAJES and not en_caso:
+        with st.container(key="nota_desafio"):
+            with st.expander("Desafiar a Holmes", icon=":material/mail_lock:"):
+                st.caption("Escríbale un mensaje secreto y vea si Holmes descubre el código.")
+                formulario_desafio("libreta")
     st.divider()
-    if st.button("Salir de Baker Street (reiniciar)", icon=":material/door_open:", width="stretch"):
+    if st.button("Salir de Baker Street (reiniciar)", icon=":material/door_open:", width="stretch", key="salir"):
         reiniciar()
         st.rerun()
     if motor.mcp_fallo:
@@ -466,31 +733,14 @@ with st.sidebar:
 # Conversación
 # ---------------------------------------------------------------------------
 
-ORNAMENTO = (  # filigrana dorada del encabezado
-    '<svg viewBox="0 0 420 36" aria-hidden="true" fill="none" stroke="#D4AF61" stroke-width="1.4">'
-    '<path d="M10 18h140M270 18h140"/><path d="M150 18c14 0 18-12 30-12 10 0 14 7 14 12s-4 12-14 12c-12 0-16-12-30-12z"/>'
-    '<path d="M270 18c-14 0-18-12-30-12-10 0-14 7-14 12s4 12 14 12c12 0 16-12 30-12z"/>'
-    '<path d="M196 18c4-9 10-13 14-13s10 4 14 13c-4 9-10 13-14 13s-10-4-14-13z" fill="#D4AF61" fill-opacity=".25"/>'
-    '<circle cx="210" cy="18" r="3.2" fill="#D4AF61"/><circle cx="6" cy="18" r="2.4" fill="#D4AF61"/>'
-    '<circle cx="414" cy="18" r="2.4" fill="#D4AF61"/></svg>'
-)
-st.markdown(
-    f'<div class="cabecera">{ORNAMENTO}<div class="titulo-221b">221B Baker Street</div>'
-    '<div class="subtitulo-221b">Londres, 1895 • Sherlock Holmes, detective consultor</div>'
-    f'<div style="transform: scaleY(-1)">{ORNAMENTO}</div></div>',
-    unsafe_allow_html=True)
+st.markdown(fichas.CABECERA, unsafe_allow_html=True)
 
 if not S.mensajes:
-    st.markdown(
-        '<p class="entrada-escena">La niebla se pega a los cristales. Sube usted los diecisiete escalones y '
-        "llama a la puerta. Desde dentro llega el gemido de un violín que se interrumpe de golpe.</p>"
-        '<p class="entrada-escena">Escriba su primer mensaje para entrar: Holmes deducirá algo sobre usted '
-        "y le ofrecerá traerle un caso o ayudarle con uno suyo.</p>",
-        unsafe_allow_html=True)
+    st.markdown(fichas.BIENVENIDA, unsafe_allow_html=True)
 
-for m in S.mensajes:
+for i, m in enumerate(S.mensajes):
     if not m.get("oculto"):
-        mostrar_mensaje(m)
+        mostrar_mensaje(m, i)
 
 limite = S.enviados >= MAX_MENSAJES
 if limite:
@@ -519,8 +769,46 @@ def acciones_rapidas() -> None:
                 st.rerun()
 
 
+def elegir_camino_en_chat() -> None:
+    """Los dos caminos también en el tablero, no solo en la libreta (en el celular está escondida)."""
+    st.markdown('<p class="titulo-acciones">Elija su camino:</p>', unsafe_allow_html=True)
+    col_a, col_b = st.columns(2)
+    if col_a.button("A · Le traigo un caso", key="camino_A", width="stretch"):
+        procesar_mensaje("Elijo la opción A: le traigo un caso.")
+        st.rerun()
+    if col_b.button("B · Quiero ayudarle con su caso", key="camino_B", width="stretch"):
+        procesar_mensaje("Elijo la opción B: quiero ayudarle con su caso.")
+        st.rerun()
+
+
+def acciones_modo_a() -> None:
+    """Modo A: desafiar a Holmes con un mensaje cifrado y, cuando ya contó su caso, pedir el relato."""
+    st.markdown('<p class="titulo-acciones">¿Qué hacemos ahora?</p>', unsafe_allow_html=True)
+    columnas = st.columns(2)
+    with columnas[0].popover("Desafiarlo con un mensaje cifrado", key="accion_desafio", width="stretch"):
+        formulario_desafio("tablero")
+    if puede_pedir_relato() and columnas[1].button("Pedirle a Watson que lo escriba", key="accion_relato",
+                                                   width="stretch"):
+        pedir_relato()
+        st.rerun()
+
+
+def acciones_fin_de_caso() -> None:
+    st.markdown('<p class="titulo-acciones">El caso está cerrado.</p>', unsafe_allow_html=True)
+    columnas = st.columns(2)
+    if columnas[0].button("Pedirle a Watson que lo escriba", key="accion_relato", width="stretch"):
+        pedir_relato()
+        st.rerun()
+
+
+if S.modo is None and S.mensajes and not limite:
+    elegir_camino_en_chat()
+if S.modo == "A" and not limite:
+    acciones_modo_a()
 if S.modo == "B" and S.caso is not None and not S.terminado and not limite:
     acciones_rapidas()
+if S.modo == "B" and S.terminado and puede_pedir_relato():
+    acciones_fin_de_caso()
 
 if entrada := st.chat_input("Hable con Holmes...", disabled=limite):
     procesar_mensaje(entrada)

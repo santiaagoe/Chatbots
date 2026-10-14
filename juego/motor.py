@@ -198,15 +198,17 @@ class Motor:
         raise ultimo_error
 
     # ------------------------------------------------------------------ texto
-    def responder(self, mensajes: list[dict], instruccion_sistema: str) -> str:
+    def responder(self, mensajes: list[dict], instruccion_sistema: str, usar_indice: bool = True) -> str:
+        """Respuesta de Holmes. Con usar_indice=False no se le ofrece el índice MCP: si el mensaje no
+        trata de los libros, así se ahorra la consulta extra que gasta buscar en ellos."""
         contenidos = a_contenidos(mensajes)
         return self._con_reintentos(
-            lambda modelo: self._responder_con(modelo, contenidos, instruccion_sistema),
+            lambda modelo: self._responder_con(modelo, contenidos, instruccion_sistema, usar_indice),
             self._modelos_de_texto(),
         )
 
-    def _responder_con(self, modelo: str, contenidos, instruccion_sistema: str) -> str:
-        if self.config.usar_mcp:
+    def _responder_con(self, modelo: str, contenidos, instruccion_sistema: str, usar_indice: bool = True) -> str:
+        if self.config.usar_mcp and usar_indice:
             try:
                 return self.bucle.ejecutar(
                     self._responder_con_mcp(modelo, contenidos, instruccion_sistema))

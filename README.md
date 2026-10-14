@@ -2,7 +2,7 @@
 
 > *«Usted ve, pero no observa.»*
 
-Un asistente conversacional con la personalidad del Sherlock Holmes de los libros de Arthur Conan Doyle. Holmes deduce cosas sobre ti a partir de cómo escribes, resuelve los misterios que le traigas y te invita a investigar con él casos inventados en el momento, con escenas ilustradas y **mensajes cifrados que tú debes descifrar**.
+Un asistente conversacional con la personalidad del Sherlock Holmes de los libros de Arthur Conan Doyle. Holmes deduce cosas sobre ti a partir de cómo escribes, resuelve los misterios que le traigas y te invita a investigar con él casos inventados en el momento, con escenas ilustradas y **mensajes cifrados que tú debes descifrar**. También puedes desafiarlo tú a él con un mensaje en clave, y al final Watson escribe tu aventura como un relato de la *Strand Magazine*.
 
 **🎮 Pruébalo aquí:** `ENLACE_A_LA_DEMO` <!-- reemplazar tras publicar en Streamlit Cloud -->
 
@@ -20,11 +20,26 @@ Le cuentas un misterio, real o inventado, serio o cotidiano («¿quién se comi�
 ### B · «Ayudar a Holmes»
 Holmes tiene un caso abierto y tú eres su asistente:
 
-1. **Se genera un caso original y secreto**: víctima, sospechosos, culpable, móvil y pistas. La solución queda guardada en la aplicación y no cambia aunque hagas mil preguntas.
+1. **Eliges un expediente** entre tres carpetas: dos casos originales que se inventan en el momento y uno escrito a mano para tu dificultad, que funciona aunque Gemini esté saturado. El caso queda guardado en secreto en la aplicación (víctima, sospechosos, culpable, móvil y pistas) y la solución no cambia aunque hagas mil preguntas.
 2. **Vas a la escena del crimen**, ilustrada con imágenes generadas al estilo de los grabados de la *Strand Magazine*.
 3. **Interrogas sospechosos y examinas pistas**. Holmes te pone a prueba: «¿Qué concluye usted de esa mancha?».
 4. **Aparecen mensajes cifrados**: debes descubrir **qué código es** y **qué dice**. Puedes pedir hasta tres pistas o rendirte.
 5. **Haces la acusación final** (culpable y móvil) y Holmes revela la solución.
+6. **El tablero de Holmes**: aparece un tablero de corcho con un hilo rojo que une cada pista con la persona que señala (o que descarta), y marca las pistas que se te pasaron por alto.
+
+### Los casos escritos a mano
+
+| Dificultad | Caso |
+|---|---|
+| Fácil | *El caso de la partitura robada* (Covent Garden) |
+| Medio | *La aventura del candelabro torcido* (Belgravia) |
+| Difícil | *La aventura del telegrafista de Whitehall*, con una pista falsa dejada a propósito |
+
+### El relato de Watson
+Al terminar un caso (o después de contarle el tuyo), Watson lo escribe como un cuento de la *Strand Magazine* donde el protagonista eres tú: lo que preguntaste, lo que descifraste y si acertaste. Usa solo lo que pasó en la conversación y se puede descargar.
+
+### Desafiar a Holmes
+Escríbele un mensaje en clave en el chat («Descifre esto: …») o desde la libreta, donde la aplicación puede cifrarlo por ti con el código que elijas. Holmes no sabe cuál elegiste: el código prueba todos los métodos, se queda con el resultado que más parece español y Holmes cuenta cómo lo descubrió (la letra que más se repite, el zigzag de la cerca…). Entiende tanto el alfabeto español como el inglés de 26 letras. Si no lo logra, no inventa: lo reconoce y, si parece un Vigenère, te pide la clave. Tampoco te resuelve los mensajes del caso que estás jugando.
 
 ### Los 10 códigos
 
@@ -42,7 +57,8 @@ Los bailarines se dibujan con figuras propias: 27 posiciones (brazo izquierdo ×
 
 - Personalidad, método y forma de hablar basados en los relatos originales (ver [`personaje/prompt_sistema.md`](personaje/prompt_sistema.md)).
 - Vive en 1895: si le hablas de un celular, lo analiza como un artefacto desconocido.
-- **Nunca dice «Elemental, mi querido Watson»**, porque esa frase no aparece en los libros.
+- **Nunca dice «Elemental, mi querido Watson»**, porque esa frase no aparece en los libros, y se molesta si se la atribuyes.
+- Tiene las costumbres de los relatos: toca el violín si se lo pides, se pone serio con Moriarty, presume de ignorar si la Tierra gira alrededor del Sol y corrige a quien lo llama «detective privado».
 - Sus deducciones sobre ti usan solo datos reales de la conversación; nunca inventa que «ve barro en tus zapatos».
 - Consulta su **índice** (un servidor MCP con los textos originales) cuando le preguntas por casos antiguos.
 
@@ -66,6 +82,8 @@ flowchart LR
 **Principio de diseño:** la IA pone la voz y la historia; **el código controla las reglas**.
 
 - **Los cifrados los hace el código**, no la IA (los modelos se equivocan escribiendo Morse). Así cada mensaje es siempre correcto y descifrable. Están cubiertos por pruebas automáticas.
+- **Descifrar también lo hace el código** ([`juego/descifrador.py`](juego/descifrador.py)): prueba los diez métodos y puntúa cada resultado según cuántas palabras españolas conocidas contiene y qué tan naturales son sus parejas de letras ([`juego/bigramas.py`](juego/bigramas.py), calculadas con los propios textos del proyecto). Gemini solo pone la voz.
+- **El hilo rojo** se dibuja con código (SVG) a partir del caso guardado: no gasta consultas ni imágenes.
 - **El caso se genera una sola vez en JSON** con esquema estricto y se le recuerda a Holmes en cada turno, por lo que la solución nunca cambia.
 - **La aplicación y Holmes se comunican con etiquetas**: la app le envía `[CASO SECRETO]`, `[PISTA CIFRADA]`, `[RESULTADO]`…, y Holmes le pide cosas con `[[IMAGEN: …]]` o `[[MODO: B]]`, que la app quita antes de mostrar el mensaje.
 - **El índice MCP** ([`indice_mcp/servidor.py`](indice_mcp/servidor.py)) expone dos herramientas (`buscar_en_mis_archivos`, `listar_relatos`) con búsqueda BM25 sobre los relatos. Un puente propio declara esas herramientas a Gemini y ejecuta las llamadas por el protocolo MCP. El servidor también funciona solo (`python indice_mcp/servidor.py`) con cualquier cliente MCP.
@@ -84,17 +102,23 @@ Chatbots/
 │   ├── motor.py              # conexión con Gemini + puente MCP
 │   ├── imagenes_cloudflare.py # imágenes gratis con Cloudflare Workers AI
 │   ├── caso.py               # caso secreto (JSON) y juicio del móvil
+│   ├── caso_muestra.py       # los tres casos escritos a mano
 │   ├── cifrados.py           # los 10 cifrados
+│   ├── descifrador.py        # Holmes descifra los mensajes del visitante
+│   ├── bigramas.py           # parejas de letras del español (para el descifrador)
+│   ├── relato.py             # el relato de Watson
+│   ├── fichas.py             # fichas, carpetas, tablero del hilo rojo y página de la Strand
 │   └── partida.py            # reglas: etiquetas, pistas, puntaje
 ├── indice_mcp/
 │   ├── servidor.py           # servidor MCP: el índice de Holmes
 │   └── textos/               # relatos descargados de Gutenberg
 ├── scripts/
-│   └── descargar_libros.py
+│   ├── descargar_libros.py
+│   └── calcular_bigramas.py  # vuelve a calcular juego/bigramas.py
 ├── tests/                    # pruebas automáticas (pytest)
-├── estilo/tema.css           # diseño: marco dorado, libreta de cuero, sellos de lacre
-├── static/                   # fondo de la calle de Londres y medallón de Holmes
-├── .streamlit/config.toml    # tema oscuro y archivos estáticos
+├── estilo/tema.css           # diseño: tablero de corcho, libreta de cuero y papeles clavados
+├── static/                   # foto de la calle de Londres y medallón de Holmes
+├── .streamlit/config.toml    # colores del tema y archivos estáticos
 ├── requirements.txt
 ├── LICENSE                   # licencia MIT
 └── .env.example
@@ -107,7 +131,7 @@ Chatbots/
 Necesitas Python 3.10 o superior y una clave gratuita de [Google AI Studio](https://aistudio.google.com/apikey).
 
 ```bash
-git clone https://github.com/TU_USUARIO/Chatbots.git
+git clone https://github.com/santiaagoe/Chatbots.git
 cd Chatbots
 
 python -m venv .venv
@@ -128,7 +152,7 @@ streamlit run app.py
 pytest
 ```
 
-Las pruebas verifican que cada cifrado se pueda descifrar, el servidor MCP, el puente con Gemini y una partida completa de punta a punta (con un Gemini simulado, sin gastar la API).
+Las pruebas verifican que cada cifrado se pueda descifrar (y que Holmes lo descubra solo, sin inventar nada ante un texto sin sentido), la coherencia de los casos escritos a mano, el tablero del hilo rojo, el relato de Watson, el servidor MCP, el puente con Gemini y partidas completas de punta a punta (con un Gemini simulado, sin gastar la API).
 
 ---
 

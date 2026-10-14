@@ -47,8 +47,120 @@ _ACUSACION = re.compile(
     r"\b(acuso|acusamos|acusar|acusación|culpable|asesin[oa]|fue (él|ella|el|la)\b|"
     r"(lo|la) (hizo|mató|robó)|ya s[eé] qui[eé]n fue)", re.IGNORECASE)
 _MODO = re.compile(r"\[\[\s*MODO\s*:\s*([AB])\s*\]\]", re.IGNORECASE)
+_NOTA = re.compile(r"\[\[\s*NOTA\s*:\s*(.+?)\s*\]\]", re.IGNORECASE | re.DOTALL)
+
+# Cómo elige el visitante su camino, escrito con sus palabras
+_ELIGE_A = re.compile(
+    r"(\bopci[oó]n\s*a\b|\bcamino\s*a\b|\b(le\s+)?traigo\s+un\s+(caso|misterio)|"
+    r"\btengo\s+un\s+(caso|misterio|problema)|\bquiero\s+contarle|\bay[uú]d(arme|eme)\b|\bme\s+ayude\b|"
+    r"^\s*a\s*[.!)]?\s*$)", re.IGNORECASE)
+_ELIGE_B = re.compile(
+    r"(\bopci[oó]n\s*b\b|\bcamino\s*b\b|\bayudar(le|lo)\b|\ble\s+ayudo\b|\bayudar\s+a\s+holmes\b|"
+    r"\bsu\s+caso\b|\bcaso\s+suyo\b|"
+    r"\bacompañarl[eo]\b|^\s*b\s*[.!)]?\s*$)", re.IGNORECASE)
+
+
+# Temas de los libros originales: solo entonces vale la pena que Holmes consulte su índice MCP
+_CANON = re.compile(
+    r"(moriarty|irene|adler|lestrade|gregson|mycroft|hudson|wiggins|irregulares|baskerville|sabueso|"
+    r"reichenbach|bohemia|pelirroj|banda de lunares|speckled|escarlata|scarlet|signo de los cuatro|"
+    r"valle del miedo|gloria scott|bailarines|dancing men|milverton|moran|mary morstan|"
+    r"\bwatson\b.*\b(conoci|primer|afganist)|afganist|tus casos|sus casos|caso antiguo|casos antiguos|"
+    r"aventura de|recuerda (el|la|cuando)|cu[eé]nteme (de|sobre) (su|el) caso|\bcanon\b|conan doyle|"
+    r"en sus libros|sus relatos|sus memorias|cita textual|c[oó]mo muri[oó]|cataratas)", re.IGNORECASE)
+
+
+def necesita_indice(texto: str) -> bool:
+    """¿El mensaje habla de algo de los libros? Si no, Holmes responde sin su índice y ahorra una consulta."""
+    return bool(_CANON.search(texto or ""))
+
+
+def detectar_modo(texto: str) -> str | None:
+    """¿El visitante eligió un camino? La app lo decide sola, sin depender de Holmes."""
+    a, b = bool(_ELIGE_A.search(texto)), bool(_ELIGE_B.search(texto))
+    if a and not b:
+        return "A"
+    if b and not a:
+        return "B"
+    return None
+
+
+# Frases mientras se espera a Gemini: una al azar para que no se repita siempre la misma
+FRASES = {
+    "pensar": [
+        "Holmes medita, la pipa entre los dientes…",
+        "Holmes junta las yemas de los dedos y cierra los ojos…",
+        "Un acorde de violín rompe el silencio mientras Holmes reflexiona…",
+        "Holmes camina de un lado a otro frente a la chimenea…",
+        "La Sra. Hudson sube el té; Holmes ni siquiera lo nota…",
+        "Holmes examina sus notas con la lupa…",
+        "Holmes enciende la pipa y la habitación se llena de humo…",
+        "Holmes hojea su índice de recortes con impaciencia…",
+        "Holmes contempla la niebla por la ventana…",
+        "Holmes murmura algo sobre cenizas de tabaco…",
+        "Holmes tamborilea con los dedos sobre la repisa…",
+        "Holmes se hunde en su sillón, la mirada perdida…",
+    ],
+    "expedientes": [
+        "Holmes revuelve el montón de cartas sobre la repisa…",
+        "Holmes saca tres carpetas del cajón de su escritorio…",
+        "Holmes rebusca entre los telegramas de la semana…",
+        "Holmes sopla el polvo de unos expedientes olvidados…",
+    ],
+    "caso": [
+        "Holmes abre el expediente y extiende los papeles sobre la mesa…",
+        "Holmes lee el expediente con una ceja levantada…",
+        "Holmes clava el expediente en el tablero de corcho…",
+        "Holmes repasa el expediente línea por línea…",
+    ],
+    "dibujo": [
+        "Un dibujante de la Strand Magazine bosqueja la escena…",
+        "El fotógrafo de Scotland Yard prepara su cámara…",
+        "Watson toma apuntes y hace un boceto del lugar…",
+    ],
+    "juicio": [
+        "Holmes cierra los ojos y junta las yemas de los dedos…",
+        "Holmes repasa cada pista en silencio antes de hablar…",
+        "Holmes se pone de pie, listo para revelar la verdad…",
+    ],
+    "descifrar": [
+        "Holmes acerca la lupa al papel…",
+        "Holmes cuenta las letras en voz baja…",
+        "Holmes anota columnas de letras en el margen del Times…",
+        "Holmes sostiene el papel a contraluz frente a la lámpara…",
+    ],
+    "relato": [
+        "Watson moja la pluma en el tintero…",
+        "Un mensajero sube la escalera con las cuartillas de Watson…",
+        "Watson escribe con su letra apresurada de médico…",
+    ],
+}
+
+# Cómo entrega Holmes el relato de Watson (no gasta consultas: el relato ya la gastó)
+ENTREGA_RELATO = [
+    "*Holmes le tiende unas cuartillas escritas a mano.* «Le conté el caso a Watson y ya me ha enviado su "
+    "versión. Exagera mis méritos, como siempre, pero esta vez reconozco que usted sale muy bien parado.»",
+    "*Llega un mensajero con un sobre a nombre del visitante.* «La letra de Watson», dice Holmes con media "
+    "sonrisa. «Insiste en convertir la ciencia de la deducción en un folletín. Léalo usted mismo.»",
+    "*Holmes deja unas hojas sobre la mesa.* «Watson no pudo resistirse. Le advierto que adorna los hechos; "
+    "es su único vicio literario.»",
+]
+
+
+def frase(tipo: str, rng: random.Random | None = None) -> str:
+    return (rng or random).choice(FRASES[tipo])
+
+
+PRESENTA_EXPEDIENTES = [
+    "Holmes despeja la mesa de un manotazo y deja caer tres carpetas. «Elija usted, colega. Cada una es un misterio distinto, y todas me aburren menos que el silencio.»",
+    "«Tengo tres asuntos pendientes», dice Holmes, extendiendo tres carpetas sobre la alfombra. «Escoja el que más le intrigue.»",
+    "Holmes saca tres expedientes del cajón y los alinea con precisión. «Lestrade me ha traído estos esta semana. ¿Cuál le parece más singular?»",
+]
 _RESTOS = re.compile(r"\[/?(CASO SECRETO|PISTA CIFRADA|AYUDA CIFRADO|RESULTADO|INICIO CASO|CONTEXTO|"
-                     r"AVISO ACUSACION|SUGERIR ACUSACION)\]?", re.IGNORECASE)
+                     r"AVISO ACUSACION|SUGERIR ACUSACION|DESAFIO)\]?", re.IGNORECASE)
+
+_BLOQUES = re.compile(r"\[(CASO SECRETO|PISTA CIFRADA|AYUDA CIFRADO|RESULTADO|INICIO CASO|AVISO ACUSACION|"
+                      r"SUGERIR ACUSACION|DESAFIO)\].*?\[/\1\]", re.IGNORECASE | re.DOTALL)
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
@@ -69,6 +181,7 @@ class Etiquetas:
     modo: str | None = None
     imagenes: list[PedidoImagen] = field(default_factory=list)
     pistas: list[int] = field(default_factory=list)   # números de pista (desde 1) reveladas
+    notas: list[str] = field(default_factory=list)    # datos que Holmes anota en el modo A
 
 
 def extraer_etiquetas(respuesta: str) -> Etiquetas:
@@ -83,13 +196,15 @@ def extraer_etiquetas(respuesta: str) -> Etiquetas:
             if int(numero) not in pistas:
                 pistas.append(int(numero))
     modo = _MODO.search(respuesta)
-    texto = _PISTA.sub("", _MODO.sub("", _IMAGEN.sub("", respuesta)))
+    notas = [" ".join(n.split()) for n in _NOTA.findall(respuesta)]
+    texto = _NOTA.sub("", _PISTA.sub("", _MODO.sub("", _IMAGEN.sub("", respuesta))))
+    texto = _BLOQUES.sub("", texto)  # un bloque de la app que Holmes repitió entero
     texto = _RESTOS.sub("", texto)
     texto = re.sub(r"[ \t]+\n", "\n", texto)
     texto = re.sub(r"(?<=\S) {2,}(?=\S)", " ", texto)  # espacios que dejan las etiquetas quitadas
     texto = re.sub(r"\n{3,}", "\n\n", texto).strip()
     return Etiquetas(texto=texto, modo=modo.group(1).upper() if modo else None,
-                     imagenes=imagenes, pistas=pistas)
+                     imagenes=imagenes, pistas=pistas, notas=notas)
 
 
 def quiere_acusar(texto: str) -> bool:
@@ -179,7 +294,11 @@ def instruccion_sistema(prompt: str, modo: str | None, caso: Caso | None,
     if modo is None:
         partes.append("El visitante aún no ha elegido un camino.")
     elif modo == "A":
-        partes.append("Modo A: el visitante te trae un caso. No solicites imágenes.")
+        partes.append("Modo A: el visitante te trae un caso. No solicites imágenes. Cuando el visitante "
+                      "te dé un dato importante del caso, anótalo al final con [[NOTA: dato breve]].")
+    elif caso is None:
+        partes.append("Modo B: el visitante está eligiendo uno de tres expedientes que la aplicación "
+                      "le muestra. Si te pregunta, comenta brevemente y anímalo a elegir uno.")
     else:
         partes.append("Modo B: el visitante te ayuda con tu caso.")
     if modo == "B" and caso is not None:

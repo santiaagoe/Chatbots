@@ -6,8 +6,9 @@ import pytest
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
+from conftest import abrir_primer_expediente, opciones_falsas
 from juego import motor
-from juego.caso import Caso, Persona, Pista, Sospechoso, Veredicto
+from juego.caso import Caso, OpcionesCaso, Persona, Pista, Sospechoso, Veredicto
 
 
 def png_de_prueba() -> bytes:
@@ -38,7 +39,7 @@ def app(monkeypatch):
     monkeypatch.setenv("USAR_MCP", "0")
     respuestas = []
 
-    def responder(self, mensajes, instruccion):
+    def responder(self, mensajes, instruccion, **_):
         ultimo = mensajes[-1].get("para_ia") or mensajes[-1]["texto"]
         respuestas.append(instruccion)
         if "opción B" in ultimo:
@@ -51,6 +52,8 @@ def app(monkeypatch):
         return "Interesante. Usted escribe de noche."
 
     def generar_json(self, instruccion, esquema, temperatura=1.0):
+        if esquema is OpcionesCaso:
+            return opciones_falsas()
         return caso_falso() if esquema is Caso else Veredicto(movil_correcto=True, comentario="Bien.")
 
     monkeypatch.setattr(motor.Motor, "responder", responder)
@@ -69,7 +72,9 @@ def test_partida_completa(app):
 
     boton_b = next(b for b in at.sidebar.button if "Ayudar a Holmes" in b.label)
     boton_b.click().run()  # elige el camino B desde la libreta
-    assert at.session_state.modo == "B"
+    assert at.session_state.modo == "B" and at.session_state.caso is None
+    assert len(at.session_state.opciones_caso) == 3  # dos nuevos y el caso de muestra
+    abrir_primer_expediente(at)
     assert at.session_state.caso.titulo.startswith("La aventura")
     assert at.session_state.imagenes_usadas == 0  # nunca en la presentación
     assert "[CASO SECRETO]" in respuestas[-1]

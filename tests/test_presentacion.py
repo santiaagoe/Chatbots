@@ -8,8 +8,9 @@ from google.genai import errors
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
+from conftest import abrir_primer_expediente, opciones_falsas
 from juego import fichas, motor, partida
-from juego.caso import Caso, Persona, Pista, Sospechoso, Veredicto, caso_para_holmes
+from juego.caso import Caso, OpcionesCaso, Persona, Pista, Sospechoso, Veredicto, caso_para_holmes
 
 
 def png() -> bytes:
@@ -62,7 +63,7 @@ def test_ficha_muestra_todos_los_sospechosos_con_su_motivo(medio):
         assert s.nombre in html and s.motivo_sospecha in html and s.ocupacion in html
     assert "Sir Hugh Pemberton" in html and "El rubí desapareció" in html and "Pemberton House" in html
     assert not any(secreto in html for secreto in SECRETOS)
-    assert ("STOP" in html) == (medio == "telegrama")
+    assert ("class='stop'" in html) == (medio == "telegrama")
 
 
 def test_ficha_y_expediente_escapan_el_html_de_la_ia():
@@ -145,7 +146,7 @@ def sim(monkeypatch):
     monkeypatch.setenv("USAR_MCP", "0")
     estado = Sim()
 
-    def responder(self, mensajes, instruccion):
+    def responder(self, mensajes, instruccion, **_):
         estado.instrucciones.append(instruccion)
         turno = []  # todo lo que llegó desde la última respuesta de Holmes (visitante + notas)
         for m in reversed(mensajes):
@@ -170,6 +171,8 @@ def sim(monkeypatch):
         return "Interesante."
 
     def generar_json(self, instruccion, esquema, temperatura=1.0):
+        if esquema is OpcionesCaso:
+            return opciones_falsas()
         if esquema is Caso:
             estado.medios.append(instruccion)
             return caso_de_prueba()
@@ -191,6 +194,8 @@ def abrir_caso_b() -> AppTest:
     at.chat_input[0].set_value("Buenas noches").run()
     next(b for b in at.sidebar.button if "Ayudar a Holmes" in b.label).click().run()
     assert not at.exception and at.session_state.modo == "B"
+    abrir_primer_expediente(at)
+    assert not at.exception and at.session_state.caso is not None
     return at
 
 

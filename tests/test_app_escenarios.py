@@ -7,8 +7,9 @@ from google.genai import errors
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
+from conftest import abrir_primer_expediente, opciones_falsas
 from juego import cifrados, motor
-from juego.caso import Caso, Persona, Pista, Sospechoso, Veredicto
+from juego.caso import Caso, OpcionesCaso, Persona, Pista, Sospechoso, Veredicto
 
 
 def png() -> bytes:
@@ -48,6 +49,7 @@ class Simulacion:
         self.instrucciones = []
         self.falla_texto = None
         self.falla_caso = None
+        self.falla_opciones = None
         self.falla_imagen = None
 
 
@@ -57,7 +59,7 @@ def simulacion(monkeypatch):
     monkeypatch.setenv("USAR_MCP", "0")
     sim = Simulacion()
 
-    def responder(self, mensajes, instruccion):
+    def responder(self, mensajes, instruccion, **_):
         sim.instrucciones.append(instruccion)
         if sim.falla_texto:
             raise sim.falla_texto
@@ -73,6 +75,10 @@ def simulacion(monkeypatch):
         return "Interesante."
 
     def generar_json(self, instruccion, esquema, temperatura=1.0):
+        if esquema is OpcionesCaso:
+            if sim.falla_opciones:
+                raise sim.falla_opciones
+            return opciones_falsas()
         if esquema is Caso:
             if sim.falla_caso:
                 raise sim.falla_caso
@@ -114,6 +120,8 @@ def entrar_al_caso_b(at):
     at.chat_input[0].set_value("Buenas noches").run()
     boton(at, "Ayudar a Holmes").click().run()
     assert at.session_state.modo == "B"
+    abrir_primer_expediente(at)
+    assert at.session_state.caso is not None
 
 
 def test_modo_a(simulacion):
@@ -205,16 +213,36 @@ def test_pedir_pistas_y_rendirse_con_los_bailarines(simulacion, monkeypatch):
     assert not at.exception
 
 
-def test_si_falla_la_generacion_del_caso_se_puede_volver_a_elegir(simulacion):
-    simulacion.falla_caso = error_503()
+def test_si_gemini_no_puede_crear_casos_queda_el_de_muestra(simulacion):
+    simulacion.falla_opciones = error_503()
     at = abrir()
     at.chat_input[0].set_value("Buenas noches").run()
     boton(at, "Ayudar a Holmes").click().run()
     assert not at.exception
-    assert at.session_state.modo is None
-    simulacion.falla_caso = None
+    assert at.session_state.modo == "B"
+    opciones = at.session_state.opciones_caso
+    assert len(opciones) == 1 and opciones[0].muestra  # solo el caso de muestra
+    assert "saturados (503)" in textos_detalle(at)
+    llamadas_antes = len(simulacion.instrucciones)
+    abrir_primer_expediente(at)
+    assert not at.exception
+    caso = at.session_state.caso
+    assert caso.titulo == "La aventura del candelabro torcido" and caso.culpable == "Ada Lowe"
+    assert len(caso.pistas) == 6 and len(at.session_state.pistas) == 2
+    assert len(simulacion.instrucciones) == llamadas_antes + 1  # solo la presentación de Holmes
+
+
+def test_si_falla_un_caso_nuevo_se_puede_abrir_otro(simulacion):
+    simulacion.falla_caso = error_503()
+    at = abrir()
+    at.chat_input[0].set_value("Buenas noches").run()
     boton(at, "Ayudar a Holmes").click().run()
-    assert at.session_state.modo == "B" and at.session_state.caso is not None
+    abrir_primer_expediente(at)
+    assert not at.exception
+    assert at.session_state.caso is None and at.session_state.opciones_caso is not None
+    assert "faltan páginas" in at.session_state.mensajes[-1]["texto"]
+    at.button(key="expediente_2").click().run()  # el caso de muestra no depende de Gemini
+    assert at.session_state.caso is not None and not at.exception
 
 
 def test_acusacion_equivocada_y_nuevo_caso(simulacion):
