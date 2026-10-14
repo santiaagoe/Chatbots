@@ -4,7 +4,7 @@
 
 Un asistente conversacional con la personalidad del Sherlock Holmes de los libros de Arthur Conan Doyle. Holmes deduce cosas sobre ti a partir de cómo escribes, resuelve los misterios que le traigas y te invita a investigar con él casos inventados en el momento, con escenas ilustradas y **mensajes cifrados que tú debes descifrar**. También puedes desafiarlo tú a él con un mensaje en clave, y al final Watson escribe tu aventura como un relato de la *Strand Magazine*.
 
-**🎮 Pruébalo aquí:** `ENLACE_A_LA_DEMO` <!-- reemplazar tras publicar en Streamlit Cloud -->
+**🎮 Pruébalo aquí:** [sherlockholmeschatbot.streamlit.app](https://sherlockholmeschatbot.streamlit.app)
 
 <!-- Agrega aquí una captura o un GIF de una partida: ![Partida](docs/partida.gif) -->
 
