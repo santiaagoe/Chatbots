@@ -1,11 +1,10 @@
 """
-Casos completos escritos a mano, uno por dificultad.
+Casos completos escritos a mano, uno por dificultad: «el archivo de Holmes».
 
-Siempre aparece uno como carpeta del modo B: el de la dificultad elegida (si el
-visitante ya lo jugó, otro que no haya jugado). No necesitan que Gemini invente
-nada, así que funcionan aunque la API esté saturada o se haya acabado la cuota
-del día (Holmes igual necesita a Gemini para conversar). Están revisados y se
-pueden resolver razonando, así que también sirven para mostrar el juego.
+Aparecen como carpetas del modo B solo cuando Gemini no puede inventar casos
+nuevos (API saturada o cuota del día agotada). No necesitan que Gemini invente
+nada, así que siempre se pueden abrir (Holmes igual necesita a Gemini para
+conversar). Están revisados y se pueden resolver razonando.
 
 Cada pista dice a quién apunta (apunta_a) y si lo incrimina o lo descarta:
 con eso se dibuja el hilo rojo al final del caso.
@@ -331,6 +330,21 @@ CASOS_MUESTRA: list[CasoMuestra] = [
                    muestra=True),
         _telegrafista, "carta", "el robo de un documento secreto del gobierno"),
 ]
+
+
+# Para que Gemini no proponga casos parecidos a los escritos a mano
+TEMAS_RESERVADOS = "; ".join(c.tema for c in CASOS_MUESTRA)
+
+
+def muestras_para(dificultad: str, jugados: list[str] | None = None) -> list[CasoMuestra]:
+    """Los casos del archivo que se ofrecen cuando Gemini no puede crear casos nuevos.
+
+    Primero el de la dificultad elegida; se omiten los ya jugados (salvo que se hayan jugado todos).
+    """
+    jugados = jugados or []
+    orden = sorted(CASOS_MUESTRA, key=lambda c: c.dificultad != dificultad)
+    pendientes = [c for c in orden if c.opcion.titulo not in jugados]
+    return pendientes or orden
 
 
 def elegir_muestra(dificultad: str, jugados: list[str] | None = None) -> CasoMuestra:

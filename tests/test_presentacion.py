@@ -247,7 +247,7 @@ def test_escena_dibujada_con_los_datos_del_caso_y_pistas_anotadas(sim):
     assert at.session_state.escena_dibujada and at.session_state.pistas_anotadas == [1, 2]
     imagen = at.session_state.mensajes[-1]["imagenes"][0]
     assert imagen[2] == "El salón de Pemberton House"
-    assert "Anotado en la libreta: Restos de cera" in html_del_chat(at)
+    assert "Anotado en los Archivos: Restos de cera" in html_del_chat(at)
     assert "Pistas anotadas (2/3)" in expediente(at) and "Un guante" in expediente(at)
     assert any("Examinar la escena" in b.label for b in at.main.button)
 

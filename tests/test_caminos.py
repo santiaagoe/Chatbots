@@ -103,9 +103,9 @@ def test_escribir_la_opcion_b_cambia_el_modo_y_muestra_carpetas(sim):
     assert sim.opciones_pedidas == 1
     ofertas = [m for m in at.session_state.mensajes if m.get("expedientes")]
     assert len(ofertas) == 1 and len(ofertas[0]["expedientes"]) == 3
-    assert ofertas[0]["expedientes"][-1]["muestra"]
+    assert not any(e["muestra"] for e in ofertas[0]["expedientes"])  # con Gemini, solo casos nuevos
     chat = " ".join(m.value for m in at.markdown)
-    assert "El misterio del faro apagado" in chat and "Caso de muestra" in chat
+    assert "El misterio del faro apagado" in chat and "Del archivo de Holmes" not in chat
 
     abrir_primer_expediente(at)
     assert at.session_state.caso is not None

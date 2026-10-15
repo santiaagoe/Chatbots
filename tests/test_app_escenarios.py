@@ -213,7 +213,7 @@ def test_pedir_pistas_y_rendirse_con_los_bailarines(simulacion, monkeypatch):
     assert not at.exception
 
 
-def test_si_gemini_no_puede_crear_casos_queda_el_de_muestra(simulacion):
+def test_si_gemini_no_puede_crear_casos_quedan_los_del_archivo(simulacion):
     simulacion.falla_opciones = error_503()
     at = abrir()
     at.chat_input[0].set_value("Buenas noches").run()
@@ -221,7 +221,8 @@ def test_si_gemini_no_puede_crear_casos_queda_el_de_muestra(simulacion):
     assert not at.exception
     assert at.session_state.modo == "B"
     opciones = at.session_state.opciones_caso
-    assert len(opciones) == 1 and opciones[0].muestra  # solo el caso de muestra
+    assert len(opciones) == 3 and all(o.muestra for o in opciones)  # los tres casos del archivo
+    assert opciones[0].titulo == "La aventura del candelabro torcido"  # primero el de su dificultad
     assert "saturados (503)" in textos_detalle(at)
     llamadas_antes = len(simulacion.instrucciones)
     abrir_primer_expediente(at)
@@ -239,9 +240,9 @@ def test_si_falla_un_caso_nuevo_se_puede_abrir_otro(simulacion):
     boton(at, "Ayudar a Holmes").click().run()
     abrir_primer_expediente(at)
     assert not at.exception
-    assert at.session_state.caso is None and at.session_state.opciones_caso is not None
+    assert at.session_state.caso is None and all(o.muestra for o in at.session_state.opciones_caso)
     assert "faltan páginas" in at.session_state.mensajes[-1]["texto"]
-    at.button(key="expediente_2").click().run()  # el caso de muestra no depende de Gemini
+    at.button(key="expediente_0").click().run()  # los casos del archivo no dependen de Gemini
     assert at.session_state.caso is not None and not at.exception
 
 

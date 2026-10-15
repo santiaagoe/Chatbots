@@ -50,24 +50,24 @@ GUIA = (
     "<div class='guia'><b>🔍 Cómo investigar</b><ul>"
     "<li>💬 <b>Investigue conversando</b> en el chat: examine lugares, interrogue a los sospechosos "
     "y pregúntele a Holmes. Los botones bajo el chat le sugieren por dónde seguir.</li>"
-    "<li>📁 El <b>expediente</b> y las <b>pistas</b> que descubra se anotan solos en la libreta "
+    "<li>📁 El <b>expediente</b> y las <b>pistas</b> que descubra se anotan solos en los Archivos "
     "(la barra lateral; en el celular, ábrala con la flecha de arriba a la izquierda).</li>"
-    "<li>📜 Los <b>mensajes cifrados</b> se resuelven en la libreta.</li>"
+    "<li>📜 Los <b>mensajes cifrados</b> se resuelven en los Archivos.</li>"
     "<li>⚖️ Cuando sepa quién fue y por qué, haga la acusación en <b>⚖️ Acusación final</b>, "
-    "en la libreta. Solo hay una oportunidad.</li>"
+    "en los Archivos. Solo hay una oportunidad.</li>"
     "</ul></div>"
 )
 
 AVISO_ACUSACION = (
     "<div class='aviso-acusacion'>⚖️ <b>¿Listo para acusar?</b> La acusación formal se hace en "
-    "<b>⚖️ Acusación final</b>, en la libreta (barra lateral): elija al culpable y escriba el móvil. "
+    "<b>⚖️ Acusación final</b>, en los Archivos (barra lateral): elija al culpable y escriba el móvil. "
     "Es definitiva, así que repase antes el expediente.</div>"
 )
 
 
 def pista_anotada(caso: Caso, numero: int) -> str:
     pista = caso.pistas[numero - 1]
-    return (f"<div class='pista-anotada'>📝 Anotado en la libreta: {escape(pista.descripcion)} "
+    return (f"<div class='pista-anotada'>📝 Anotado en los Archivos: {escape(pista.descripcion)} "
             f"<i>({escape(pista.ubicacion)})</i></div>")
 
 
@@ -77,7 +77,7 @@ def md(texto: str) -> str:
 
 
 def sospechosos_markdown(caso: Caso) -> str:
-    """Sección «Sospechosos» de la libreta: nombre, ocupación y por qué se sospecha de cada uno."""
+    """Sección «Sospechosos» de los Archivos: nombre, ocupación y por qué se sospecha de cada uno."""
     return "\n".join(f"- **{md(s.nombre)}**, {md(s.ocupacion)}. *{md(s.motivo_sospecha)}*"
                      for s in caso.sospechosos)
 
@@ -108,7 +108,7 @@ def expediente_markdown(caso: Caso, pistas_anotadas: list[int]) -> str:
 def carpeta_expediente(opcion: dict, elegida: bool = False, apagada: bool = False) -> str:
     """Una carpeta de papel manila clavada en el corcho, con lo que se ve antes de abrirla."""
     clases = "carpeta" + (" elegida" if elegida else "") + (" apagada" if apagada else "")
-    sello = ("<div class='carpeta-sello'>Caso de muestra · siempre disponible</div>"
+    sello = ("<div class='carpeta-sello'>Del archivo de Holmes</div>"
              if opcion.get("muestra") else "")
     return (
         f"<div class='{clases}'><span class='chinche ch-rojo'></span>"

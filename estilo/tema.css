@@ -175,7 +175,7 @@
 .carpeta-titulo { font-family: var(--titulos); font-weight: 700; font-size: 1.02rem; line-height: 1.25; margin-bottom: 6px; }
 .carpeta-lugar { font-style: italic; color: var(--tinta-suave); font-size: .88rem; margin-bottom: 8px; }
 .carpeta-gancho { font-size: .94rem; line-height: 1.45; }
-.carpeta-sello { margin-top: 10px; display: inline-block; padding: 2px 8px; border: 1.5px solid var(--lacre); color: var(--lacre);
+.carpeta-sello { margin-top: 10px; display: inline-block; padding: 2px 8px; border: 1.5px solid var(--tinta-suave); color: var(--tinta-suave);
   font-family: var(--titulos); font-weight: 700; font-size: .7rem; letter-spacing: .05em; transform: rotate(-3deg); }
 /* Botones de las carpetas alineados abajo aunque los textos tengan largos distintos */
 [data-testid="stHorizontalBlock"]:has(.carpeta) { align-items: stretch; }
@@ -318,7 +318,7 @@
 [data-testid="stSidebarUserContent"]::before { content: ""; position: absolute; inset: 9px; border: 1.5px dashed rgba(230, 190, 130, .35); border-radius: 8px; pointer-events: none; }
 .libreta-pinza { position: relative; display: block; width: 170px; height: 92px; margin: -5.4rem auto .2rem; pointer-events: none;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 170 92'><defs><linearGradient id='b' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='%23F4DCA0'/><stop offset='.5' stop-color='%23B08A40'/><stop offset='1' stop-color='%236B4C1C'/></linearGradient></defs><circle cx='85' cy='18' r='14' fill='none' stroke='url(%23b)' stroke-width='6'/><path d='M40 92 L52 40 Q85 26 118 40 L130 92 Z' fill='url(%23b)' stroke='%235E4313' stroke-width='1.5'/><rect x='20' y='70' width='130' height='18' rx='5' fill='url(%23b)' stroke='%235E4313' stroke-width='1.5'/><circle cx='34' cy='79' r='3.5' fill='%235E4313'/><circle cx='136' cy='79' r='3.5' fill='%235E4313'/></svg>") center / contain no-repeat; }
-.libreta-titulo { font-family: var(--titulos); font-weight: 700; text-align: center; font-size: 1.7rem; line-height: 1.1;
+.libreta-titulo { font-family: var(--titulos); font-weight: 700; text-align: center; font-size: 1.5rem; line-height: 1.15;
   color: #E7C27A; text-shadow: 0 2px 0 #3A1A0D, 0 0 12px rgba(231, 194, 122, .25); margin: .3rem 0 .6rem; }
 .insignia { text-align: center; font-family: var(--titulos); font-weight: 600; color: #F1DFB8; font-size: .95rem; letter-spacing: .03em;
   border-bottom: 1px solid rgba(241, 223, 184, .45); padding-bottom: 4px; margin: 0 auto .5rem; width: max-content; max-width: 100%; }

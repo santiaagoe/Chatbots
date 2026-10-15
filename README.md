@@ -20,14 +20,14 @@ Le cuentas un misterio, real o inventado, serio o cotidiano («¿quién se comi�
 ### B · «Ayudar a Holmes»
 Holmes tiene un caso abierto y tú eres su asistente:
 
-1. **Eliges un expediente** entre tres carpetas: dos casos originales que se inventan en el momento y uno escrito a mano para tu dificultad, que funciona aunque Gemini esté saturado. El caso queda guardado en secreto en la aplicación (víctima, sospechosos, culpable, móvil y pistas) y la solución no cambia aunque hagas mil preguntas.
+1. **Eliges un expediente** entre tres carpetas con casos originales que se inventan en el momento. Si Gemini está saturado o se acabó la cuota del día, Holmes ofrece en su lugar los casos de su archivo, escritos a mano, que se abren sin gastar consultas. El caso queda guardado en secreto en la aplicación (víctima, sospechosos, culpable, móvil y pistas) y la solución no cambia aunque hagas mil preguntas.
 2. **Vas a la escena del crimen**, ilustrada con imágenes generadas al estilo de los grabados de la *Strand Magazine*.
 3. **Interrogas sospechosos y examinas pistas**. Holmes te pone a prueba: «¿Qué concluye usted de esa mancha?».
 4. **Aparecen mensajes cifrados**: debes descubrir **qué código es** y **qué dice**. Puedes pedir hasta tres pistas o rendirte.
 5. **Haces la acusación final** (culpable y móvil) y Holmes revela la solución.
 6. **El tablero de Holmes**: aparece un tablero de corcho con un hilo rojo que une cada pista con la persona que señala (o que descarta), y marca las pistas que se te pasaron por alto.
 
-### Los casos escritos a mano
+### Los casos escritos a mano (el archivo de Holmes)
 
 | Dificultad | Caso |
 |---|---|
@@ -39,7 +39,7 @@ Holmes tiene un caso abierto y tú eres su asistente:
 Al terminar un caso (o después de contarle el tuyo), Watson lo escribe como un cuento de la *Strand Magazine* donde el protagonista eres tú: lo que preguntaste, lo que descifraste y si acertaste. Usa solo lo que pasó en la conversación y se puede descargar.
 
 ### Desafiar a Holmes
-Escríbele un mensaje en clave en el chat («Descifre esto: …») o desde la libreta, donde la aplicación puede cifrarlo por ti con el código que elijas. Holmes no sabe cuál elegiste: el código prueba todos los métodos, se queda con el resultado que más parece español y Holmes cuenta cómo lo descubrió (la letra que más se repite, el zigzag de la cerca…). Entiende tanto el alfabeto español como el inglés de 26 letras. Si no lo logra, no inventa: lo reconoce y, si parece un Vigenère, te pide la clave. Tampoco te resuelve los mensajes del caso que estás jugando.
+Escríbele un mensaje en clave en el chat («Descifre esto: …») o desde los Archivos (la barra lateral), donde la aplicación puede cifrarlo por ti con el código que elijas. Holmes no sabe cuál elegiste: el código prueba todos los métodos, se queda con el resultado que más parece español y Holmes cuenta cómo lo descubrió (la letra que más se repite, el zigzag de la cerca…). Entiende tanto el alfabeto español como el inglés de 26 letras. Si no lo logra, no inventa: lo reconoce y, si parece un Vigenère, te pide la clave. Tampoco te resuelve los mensajes del caso que estás jugando.
 
 ### Los 10 códigos
 

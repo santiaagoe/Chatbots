@@ -9,6 +9,8 @@ def opciones_falsas() -> OpcionesCaso:
                    gancho="Un rubí desaparece de una vitrina cerrada."),
         OpcionCaso(titulo="El misterio del faro apagado", tipo_crimen="desaparición", lugar="Cornualles",
                    gancho="El farero se esfuma y la luz se apaga en plena tormenta."),
+        OpcionCaso(titulo="El enigma del reloj parado", tipo_crimen="chantaje", lugar="Oxford",
+                   gancho="Un profesor recibe cartas que anuncian, al minuto, lo que hará al día siguiente."),
     ])
 
 

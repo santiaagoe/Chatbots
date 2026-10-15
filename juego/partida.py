@@ -208,7 +208,7 @@ def extraer_etiquetas(respuesta: str) -> Etiquetas:
 
 
 def quiere_acusar(texto: str) -> bool:
-    """¿El visitante intenta acusar a alguien en el chat (en vez de en la libreta)?
+    """¿El visitante intenta acusar a alguien en el chat (en vez de en los Archivos)?
 
     Una pregunta («¿quién lo hizo?», «¿es culpable el mayordomo?») no es una acusación,
     salvo que use explícitamente la palabra acusar.
@@ -314,7 +314,7 @@ def instruccion_sistema(prompt: str, modo: str | None, caso: Caso | None,
             partes.append(linea)
         anotadas = sorted(pistas_anotadas or [])
         if anotadas:
-            partes.append("Pistas ya reveladas y anotadas en la libreta del visitante: "
+            partes.append("Pistas ya reveladas y anotadas en los archivos del visitante: "
                           + ", ".join(map(str, anotadas)) + ". No vuelvas a etiquetarlas.")
         else:
             partes.append("El visitante aún no ha descubierto ninguna pista.")

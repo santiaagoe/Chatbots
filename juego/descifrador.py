@@ -611,7 +611,7 @@ def instruccion_para_holmes(hallazgo: Hallazgo, indice_caso: int | None = None) 
     if indice_caso is not None:
         return ("[DESAFIO] El visitante te pide descifrar el mensaje cifrado número "
                 f"{indice_caso + 1} de nuestro caso. NO lo descifres ni digas qué código es: eso le toca a él. "
-                "Recházalo con elegancia y anímalo a resolverlo en tu libreta, donde puede pedirte pistas. [/DESAFIO]")
+                "Recházalo con elegancia y anímalo a resolverlo en tus archivos (la barra lateral), donde puede pedirte pistas. [/DESAFIO]")
     observaciones = " ".join(hallazgo.observaciones)
     if hallazgo.tipo == "sin_cifrar":
         return (f"[DESAFIO] El visitante te entrega un mensaje, pero no está cifrado: se lee tal cual "

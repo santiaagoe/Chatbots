@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 from juego import cifrados, descifrador, fichas, partida, relato
 from juego.caso import evaluar_movil, generar_caso, generar_opciones
-from juego.caso_muestra import CASOS_MUESTRA, buscar_muestra, elegir_muestra
+from juego.caso_muestra import CASOS_MUESTRA, TEMAS_RESERVADOS, buscar_muestra, muestras_para
 from juego.imagenes_cloudflare import ErrorCloudflare
 from juego.motor import Motor, imagen_no_disponible, leer_configuracion, sin_cuota
 from juego.partida import PistaCifrada
@@ -252,32 +252,43 @@ def elegir_modo(modo: str) -> None:
 
 
 def ofrecer_expedientes() -> None:
-    """Holmes pone tres expedientes sobre la mesa: dos nuevos (una sola consulta a Gemini) y uno de muestra.
+    """Holmes pone tres expedientes nuevos sobre la mesa (una sola consulta a Gemini).
 
-    Si Gemini falla, igual queda el caso de muestra para jugar.
+    Si Gemini no puede inventarlos (saturado o sin cuota), ofrece los casos de su archivo,
+    escritos a mano, que se abren sin gastar consultas.
     """
-    error_generacion = None
-    muestra = elegir_muestra(S.dificultad, S.titulos_jugados)
     try:
         with st.spinner(partida.frase("expedientes")):
-            opciones = generar_opciones(motor, S.dificultad, S.titulos_jugados, reservado=muestra.tema)
+            opciones = generar_opciones(motor, S.dificultad, S.titulos_jugados, cantidad=3,
+                                        reservado=TEMAS_RESERVADOS)
     except Exception as error:  # noqa: BLE001
-        opciones, error_generacion = [], error
-    opciones = opciones + [muestra.opcion.model_copy()]
-    for m in S.mensajes:  # una oferta anterior ya no se puede elegir
+        ofrecer_archivo("*Holmes rebusca en vano entre los telegramas del día.* «Hoy no llegan casos nuevos, "
+                        "colega, pero mi archivo guarda algunos que nunca le he contado. Le aseguro que son "
+                        "de lo más singulares.»", error)
+        return
+    publicar_oferta(opciones, random.choice(partida.PRESENTA_EXPEDIENTES))
+
+
+def ofrecer_archivo(texto: str, error: Exception) -> None:
+    """Los casos escritos a mano: siempre se pueden abrir, aunque Gemini no pueda crear casos."""
+    opciones = [c.opcion.model_copy() for c in muestras_para(S.dificultad, S.titulos_jugados)]
+    publicar_oferta(opciones, texto, f"No se pudieron crear casos nuevos. {explicar_error(error)}")
+
+
+def publicar_oferta(opciones: list, texto: str, error: str | None = None) -> None:
+    """Holmes deja las carpetas sobre el tablero; la oferta anterior ya no se puede elegir."""
+    for m in S.mensajes:
         if m.get("expedientes") and m.get("elegido") is None:
             m["elegido"] = -1
     S.opciones_caso = opciones
     resumen = "; ".join(f"{i + 1}) «{o.titulo}», {o.tipo_crimen} en {o.lugar}" for i, o in enumerate(opciones))
     mensaje = {
-        "rol": "model", "oculto": False, "texto": random.choice(partida.PRESENTA_EXPEDIENTES),
+        "rol": "model", "oculto": False, "texto": texto,
         "para_ia": f"(Muestras al visitante expedientes para elegir: {resumen}.)",
         "expedientes": [o.model_dump() for o in opciones],
     }
-    if error_generacion is not None:
-        mensaje["texto"] = ("*Holmes rebusca en vano: la Sra. Hudson ha ordenado sus papeles.* «Solo encuentro "
-                            "este expediente, colega, pero le aseguro que es de lo más singular.»")
-        mensaje["error"] = f"No se pudieron crear casos nuevos. {explicar_error(error_generacion)}"
+    if error:
+        mensaje["error"] = error
     S.mensajes.append(mensaje)
 
 
@@ -296,10 +307,9 @@ def abrir_expediente(indice: int) -> None:
                 caso = generar_caso(motor, S.dificultad, S.titulos_jugados,
                                     medio=partida.MEDIOS[medio]["descripcion"], semilla=opcion)
     except Exception as error:  # noqa: BLE001
-        S.mensajes.append({"rol": "model", "oculto": False, "error": explicar_error(error),
-                           "texto": "*Holmes abre la carpeta y frunce el ceño: faltan páginas.* "
-                                    "Inténtelo de nuevo en un momento, o abra el caso de muestra, "
-                                    "que está completo."})
+        # Gemini no pudo escribir el caso: Holmes ofrece su archivo (y desde ahí se pueden pedir otros)
+        ofrecer_archivo("*Holmes abre la carpeta y frunce el ceño: faltan páginas.* «Tendremos que dejarlo "
+                        "para más tarde, colega. Mientras tanto, mi archivo guarda casos completos.»", error)
         return
     for m in S.mensajes:  # marca la carpeta elegida y retira los botones
         if m.get("expedientes") and m.get("elegido") is None:
@@ -350,13 +360,13 @@ def procesar_mensaje(texto: str) -> None:
             adjuntos["aviso_acusacion"] = True
             nota_oculta("[AVISO ACUSACION] El visitante intenta acusar en el chat. Responde a su "
                         "razonamiento sin confirmar ni negar si acierta, y recuérdale con tu voz que la "
-                        "acusación formal se escribe en tu libreta, en «Acusación final» (la barra lateral), "
+                        "acusación formal se escribe en tus archivos, en «Acusación final» (la barra lateral), "
                         "donde elegirá al culpable y escribirá el móvil. [/AVISO ACUSACION]")
         elif not S.acusacion_sugerida and partida.toca_sugerir_acusacion(S.pistas_anotadas, len(S.caso.pistas)):
             S.acusacion_sugerida = True
             adjuntos["aviso_acusacion"] = True
             nota_oculta("[SUGERIR ACUSACION] El visitante ya reunió la mayoría de las pistas. Al final de "
-                        "tu respuesta sugiérele que, cuando esté seguro, haga la acusación en tu libreta, "
+                        "tu respuesta sugiérele que, cuando esté seguro, haga la acusación en tus archivos, "
                         "en «Acusación final» (la barra lateral). [/SUGERIR ACUSACION]")
     turno_holmes(adjuntos)
 
@@ -554,7 +564,7 @@ def mostrar_mensaje(m: dict, indice: int = 0) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Panel lateral: la libreta de Holmes
+# Panel lateral: los archivos de Sherlock Holmes
 # ---------------------------------------------------------------------------
 
 def panel_pistas() -> None:
@@ -662,7 +672,7 @@ def boton_cambiar_camino() -> None:
 
 with st.sidebar:
     st.markdown('<div class="libreta-pinza" aria-hidden="true"></div>'
-                '<div class="libreta-titulo">La libreta<br>de Holmes</div>', unsafe_allow_html=True)
+                '<div class="libreta-titulo">Los Archivos<br>de Sherlock Holmes</div>', unsafe_allow_html=True)
     if S.modo is None:
         st.markdown('<div class="insignia">Baker Street, 221B</div>', unsafe_allow_html=True)
         with st.container(key="nota_camino"):

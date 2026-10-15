@@ -25,6 +25,7 @@ class Sim:
         self.turnos = []          # lo que vio Holmes en cada turno (texto del visitante + notas)
         self.json = []            # (instrucción, esquema) de cada consulta JSON
         self.relato_falla = False
+        self.opciones_fallan = False  # Gemini sin cuota para inventar expedientes
 
 
 @pytest.fixture
@@ -52,6 +53,8 @@ def sim(monkeypatch):
     def generar_json(self, instruccion, esquema, temperatura=1.0):
         estado.json.append((instruccion, esquema))
         if esquema is OpcionesCaso:
+            if estado.opciones_fallan:
+                raise RuntimeError("sin cuota")
             return opciones_falsas()
         if esquema is Caso:
             return caso_muestra()
@@ -86,7 +89,7 @@ def jugar_hasta_acusar(at, culpable="Ada Lowe"):
     """Modo B con el caso del candelabro, hasta la acusación final."""
     at.chat_input[0].set_value("Hola").run()
     at.button(key="camino_B").click().run()
-    at.button(key="expediente_2").click().run()  # el caso de muestra
+    at.button(key="expediente_2").click().run()  # el simulador siempre entrega el candelabro
     assert at.session_state.caso.titulo == "La aventura del candelabro torcido"
     seleccion = [s for s in at.sidebar.selectbox if s.label == "Culpable"][0]
     seleccion.set_value(culpable)
@@ -128,6 +131,16 @@ def test_cada_caso_de_muestra_es_completo_y_coherente(muestra):
     assert muestra.crear() is not muestra.crear()
 
 
+def test_el_archivo_ofrece_primero_la_dificultad_elegida_y_omite_los_jugados():
+    from juego.caso_muestra import muestras_para
+    assert [c.dificultad for c in muestras_para("difícil")] == ["difícil", "fácil", "medio"]
+    jugado = "La aventura del candelabro torcido"
+    assert [c.opcion.titulo for c in muestras_para("medio", [jugado])] == [
+        "El caso de la partitura robada", "La aventura del telegrafista de Whitehall"]
+    todos = [c.opcion.titulo for c in CASOS_MUESTRA]
+    assert len(muestras_para("medio", todos)) == 3  # si jugó todos, se ofrecen igual
+
+
 def test_hay_un_caso_de_muestra_por_dificultad():
     assert sorted(c.dificultad for c in CASOS_MUESTRA) == sorted(cifrados.DIFICULTADES)
     assert len({c.opcion.titulo for c in CASOS_MUESTRA}) == 3
@@ -141,21 +154,47 @@ def test_hay_un_caso_de_muestra_por_dificultad():
     assert buscar_muestra("No existe") is None
 
 
-def test_en_facil_se_ofrece_y_abre_la_partitura(sim):
+def test_con_gemini_las_tres_carpetas_son_casos_nuevos(sim):
+    at = abrir()
+    at.chat_input[0].set_value("Hola").run()
+    at.button(key="camino_B").click().run()
+    oferta = [m for m in at.session_state.mensajes if m.get("expedientes")][-1]
+    assert len(oferta["expedientes"]) == 3 and not any(e["muestra"] for e in oferta["expedientes"])
+    assert "error" not in oferta and "Del archivo de Holmes" not in html_visible(at)
+    pedido = [i for i, e in sim.json if e is OpcionesCaso][-1]
+    assert "exactamente 3" in pedido
+    for tema in ("partitura", "joya en una vitrina", "documento secreto"):  # no repetir los del archivo
+        assert tema in pedido
+
+
+def test_sin_cuota_en_facil_se_ofrece_el_archivo_y_abre_la_partitura(sim):
+    sim.opciones_fallan = True
     at = abrir()
     at.sidebar.select_slider[0].set_value("fácil").run()
     at.chat_input[0].set_value("Hola").run()
     at.button(key="camino_B").click().run()
-    oferta = [m for m in at.session_state.mensajes if m.get("expedientes")][-1]["expedientes"]
-    assert oferta[-1]["titulo"] == "El caso de la partitura robada" and oferta[-1]["muestra"]
-    pedido = [i for i, e in sim.json if e is OpcionesCaso][-1]
-    assert "partitura" in pedido  # Gemini no debe proponer un caso parecido
+    oferta = [m for m in at.session_state.mensajes if m.get("expedientes")][-1]
+    titulos = [e["titulo"] for e in oferta["expedientes"]]
+    assert titulos[0] == "El caso de la partitura robada" and len(titulos) == 3
+    assert all(e["muestra"] for e in oferta["expedientes"]) and oferta.get("error")
+    assert "mi archivo" in oferta["texto"] and "Del archivo de Holmes" in html_visible(at)
     casos_pedidos = sum(e is Caso for _, e in sim.json)
-    at.button(key="expediente_2").click().run()
+    at.button(key="expediente_0").click().run()
     assert at.session_state.caso.titulo == "El caso de la partitura robada"
     assert at.session_state.medio == "periodico"
     assert sum(e is Caso for _, e in sim.json) == casos_pedidos  # no gastó una consulta
     assert "Henry Pike" in html_visible(at)
+
+
+def test_desde_el_archivo_se_pueden_pedir_casos_nuevos_otra_vez(sim):
+    sim.opciones_fallan = True
+    at = abrir()
+    at.chat_input[0].set_value("Hola").run()
+    at.button(key="camino_B").click().run()
+    sim.opciones_fallan = False  # Gemini se recuperó
+    at.button(key="otros_expedientes").click().run()
+    oferta = [m for m in at.session_state.mensajes if m.get("expedientes")][-1]
+    assert not any(e["muestra"] for e in oferta["expedientes"])
 
 
 def test_la_instruccion_de_opciones_reserva_el_tema():
