@@ -173,6 +173,11 @@ def polibio_descifrar(codigo: str) -> str:
     )
 
 
+def polibio_filas() -> str:
+    """La rejilla en una línea de texto (se lee bien en cualquier nota, sin alinear columnas)."""
+    return "; ".join(f"fila {f + 1}: {' '.join(ALFABETO[f * 5:(f + 1) * 5])}" for f in range(6))
+
+
 def polibio_tabla() -> str:
     filas = ["    1 2 3 4 5"]
     for f in range(6):
@@ -394,8 +399,8 @@ def cifrar(mensaje: str, tipo: str, rng: random.Random | None = None) -> Mensaje
         return MensajeCifrado(tipo, m, polibio_cifrar(m), clave={"tabla": polibio_tabla()}, pistas=[
             "Cada letra se ha convertido en un par de cifras; ninguna cifra pasa de 6.",
             "Imagine una rejilla: la primera cifra indica la fila y la segunda, la columna.",
-            "Rejilla de 6 filas y 5 columnas con el alfabeto en orden (A=11, B=12… E=15, F=21…):\n\n```\n"
-            + polibio_tabla() + "\n```",
+            "Rejilla de 6 filas y 5 columnas con el alfabeto en orden; la primera cifra es la fila y la "
+            "segunda, la columna (A=11, E=15, F=21). " + polibio_filas() + ".",
         ])
     if tipo == "cerca":
         return MensajeCifrado(tipo, m, cerca_cifrar(m), clave={"rieles": 3}, pistas=[

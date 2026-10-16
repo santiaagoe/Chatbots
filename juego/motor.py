@@ -6,9 +6,9 @@ Aquí está todo lo que habla con la API de Google:
   - generar_json(): respuestas estructuradas (el caso secreto, el juicio del móvil).
   - generar_imagen(): ilustraciones de la escena del crimen.
 
-Si Google está saturado (errores 429/500/503/504), cada llamada se reintenta
-con esperas crecientes y, si el modelo principal sigue sin responder, se usa
-un modelo de respaldo.
+Si Google está saturado (errores 500/503/504), cada llamada se reintenta con
+esperas crecientes y, si el modelo principal sigue sin responder, se usa un
+modelo de respaldo. Si se acabó la cuota (429), se pasa directo al respaldo.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from google.genai import errors, types
 MAX_CONSULTAS_INDICE = 3            # veces que Holmes puede consultar su índice por respuesta
 CODIGOS_TRANSITORIOS = {429, 500, 503, 504}
 ESPERAS_REINTENTO = [2, 5]          # segundos entre intentos con el mismo modelo
+PAUSA_MODELO_AGOTADO = 30 * 60      # sin cuota diaria: el modelo se salta durante este tiempo
 
 
 def _esquema_compatible(esquema: dict) -> dict:
@@ -63,6 +64,17 @@ def imagen_no_disponible(error: Exception) -> bool:
     from juego.imagenes_cloudflare import ErrorCloudflare
 
     return sin_cuota(error) or (isinstance(error, ErrorCloudflare) and error.es_definitivo)
+
+
+def es_cuota_agotada(error: Exception) -> bool:
+    """¿Error 429 (cuota)? Con el mismo modelo, reintentar enseguida no sirve: se pasa al de respaldo."""
+    return isinstance(error, errors.APIError) and getattr(error, "code", None) == 429
+
+
+def es_cuota_diaria(error: Exception) -> bool:
+    """¿Se acabó la cuota del día (o el plan no incluye el modelo)? Entonces se salta ese modelo un buen rato."""
+    texto = str(error).lower().replace(" ", "").replace("_", "")
+    return es_cuota_agotada(error) and ("perday" in texto or "limit:0" in texto)
 
 
 def es_transitorio(error: Exception) -> bool:
@@ -163,17 +175,29 @@ class Motor:
         self.cliente = genai.Client(api_key=config.api_key)
         self.bucle = _BucleAsincrono()
         self.mcp_fallo: str | None = None      # último error del índice MCP, para mostrarlo
-        self.ultimo_modelo: str | None = None  # qué modelo respondió el último mensaje
+        self._por_visitante = threading.local()  # Streamlit atiende cada visitante en su propio hilo
+        self._agotados: dict[str, float] = {}    # modelo → hasta cuándo se salta (cuota diaria agotada)
         # Ojo: este objeto es compartido por TODOS los visitantes de la app
         # (Streamlit lo guarda con cache_resource). Nada que dependa de un
         # visitante debe guardarse aquí; eso va en st.session_state.
+
+    @property
+    def ultimo_modelo(self) -> str | None:
+        """Qué modelo respondió el último mensaje de ESTE visitante (no el de otro)."""
+        return getattr(self._por_visitante, "modelo", None)
+
+    @ultimo_modelo.setter
+    def ultimo_modelo(self, modelo: str | None) -> None:
+        self._por_visitante.modelo = modelo
 
     # ------------------------------------------------------------- reintentos
     def _modelos_de_texto(self) -> list[str]:
         modelos = [self.config.modelo_texto]
         if self.config.modelo_respaldo and self.config.modelo_respaldo != self.config.modelo_texto:
             modelos.append(self.config.modelo_respaldo)
-        return modelos
+        ahora = time.time()
+        disponibles = [m for m in modelos if self._agotados.get(m, 0) <= ahora]
+        return disponibles or modelos  # si todos están agotados, se intenta igual
 
     def _con_reintentos(self, llamada, modelos: list[str]):
         """Ejecuta llamada(modelo) reintentando si Google está saturado.
@@ -190,6 +214,13 @@ class Motor:
                     self.ultimo_modelo = modelo
                     return resultado
                 except Exception as error:  # noqa: BLE001
+                    if es_cuota_agotada(error):
+                        # Sin cuota: esperar unos segundos no sirve. Se pasa al siguiente modelo y, si
+                        # se acabó la del día, este modelo se salta en los próximos mensajes.
+                        ultimo_error = error
+                        if es_cuota_diaria(error):
+                            self._agotados[modelo] = time.time() + PAUSA_MODELO_AGOTADO
+                        break
                     if not es_transitorio(error):
                         raise
                     ultimo_error = error

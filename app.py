@@ -28,6 +28,7 @@ load_dotenv()
 RAIZ = Path(__file__).parent
 PROMPT = (RAIZ / "personaje" / "prompt_sistema.md").read_text(encoding="utf-8")
 MAX_MENSAJES = int(os.getenv("MAX_MENSAJES_POR_SESION", "80"))
+MAX_CARACTERES = 1000  # largo máximo de un mensaje: un texto enorme se reenviaría a Gemini en cada turno
 ZONA = ZoneInfo(os.getenv("ZONA_HORARIA", "America/Santiago"))
 ESTILO_IMAGEN = ("Victorian London, 1895, detailed engraving illustration style, sepia tones, "
                  "no text, no lettering")
@@ -138,6 +139,11 @@ motor = obtener_motor(config.api_key, config.modelo_texto, config.modelo_imagen,
 # Turnos
 # ---------------------------------------------------------------------------
 
+def sin_cupo() -> bool:
+    """¿Este visitante ya usó todos sus mensajes? Vale para el chat y para todos los botones que llaman a Gemini."""
+    return S.enviados >= MAX_MENSAJES
+
+
 def nota_oculta(texto: str) -> None:
     """Mensaje que solo ve Gemini (resultados, pistas, avisos de la app)."""
     S.mensajes.append({"rol": "user", "texto": "", "para_ia": texto, "oculto": True})
@@ -159,8 +165,9 @@ def explicar_error(error: Exception) -> str:
                 "se reintentó varias veces, también con el modelo de respaldo. Espera un minuto y vuelve a escribir.")
     if sin_cuota(error):
         return ("Tu clave de Gemini está en el nivel gratuito, que no incluye este modelo (límite 0). "
-                "No es un límite que se agote: esperar no lo arregla. Para tener imágenes hay que "
-                "activar la facturación en Google AI Studio. Mientras tanto, Holmes seguirá sin imágenes.")
+                "No es un límite que se agote: esperar no lo arregla. Hay que elegir otro modelo en la "
+                "configuración o activar la facturación en Google AI Studio. Si era el de imágenes, "
+                "Holmes seguirá sin imágenes.")
     if codigo == 429:
         return ("Se alcanzó el límite de uso de la clave de Gemini (429). En el nivel gratuito "
                 "hay un máximo de mensajes por minuto y por día; espera un poco.")
@@ -177,7 +184,7 @@ def turno_holmes(adjuntos: dict | None = None, permitir_imagen: bool = True) -> 
     """
     instruccion = partida.instruccion_sistema(
         PROMPT, S.modo, S.caso, S.pistas, S.terminado, S.imagenes_usadas, S.imagenes_activas,
-        S.pistas_anotadas, S.escena_dibujada)
+        S.pistas_anotadas, S.escena_dibujada, S.notas_a)
     try:
         ultimo = next((m["texto"] for m in reversed(S.mensajes) if m["rol"] == "user" and not m.get("oculto")), "")
         with st.spinner(partida.frase("pensar")):
@@ -195,6 +202,8 @@ def turno_holmes(adjuntos: dict | None = None, permitir_imagen: bool = True) -> 
         return None
 
     etiquetas = partida.extraer_etiquetas(respuesta)
+    if not etiquetas.texto.strip():  # respuesta vacía o bloqueada por los filtros de Gemini
+        etiquetas.texto = partida.RESPUESTA_VACIA
     mensaje = {"rol": "model", "texto": etiquetas.texto, "oculto": False, "imagenes": []}
     mensaje.update(adjuntos or {})
 
@@ -294,6 +303,8 @@ def publicar_oferta(opciones: list, texto: str, error: str | None = None) -> Non
 
 def abrir_expediente(indice: int) -> None:
     """El visitante eligió un expediente: se genera el caso completo y se presenta."""
+    if sin_cupo():
+        return
     opcion = S.opciones_caso[indice]
     S.enviados += 1
     S.mensajes.append({"rol": "user", "oculto": False, "texto": f"Abro el expediente «{opcion.titulo}»."})
@@ -329,10 +340,14 @@ def abrir_expediente(indice: int) -> None:
 
 
 def procesar_mensaje(texto: str) -> None:
+    if sin_cupo():
+        return
     S.enviados += 1
+    texto = texto[:MAX_CARACTERES]
     ahora = datetime.now(ZONA)
+    # Lo que escribe el visitante no puede hacerse pasar por una nota de la aplicación ([RESULTADO], …)
     S.mensajes.append({"rol": "user", "texto": texto, "oculto": False,
-                       "para_ia": f"{partida.contexto_hora(ahora)}\n{texto}"})
+                       "para_ia": f"{partida.contexto_hora(ahora)}\n{partida.limpiar_etiquetas(texto)}"})
     adjuntos = {}
     contaba_su_caso = S.modo == "A"  # el mensaje con el que elige el camino A no cuenta
     if S.modo is None:
@@ -420,13 +435,15 @@ def responder_desafio_en_chat(texto: str) -> bool:
 
 def entregar_desafio(texto: str, tipo: str, clave: str) -> None:
     """Desde el formulario: la app cifra el mensaje (si hace falta) y se lo entrega a Holmes."""
-    desafio = descifrador.cifrar_desafio(texto, tipo, clave)
+    if sin_cupo():
+        return
+    desafio = descifrador.cifrar_desafio(texto[:MAX_CARACTERES], tipo, clave)
     S.enviados += 1
     S.mensajes.append({
         "rol": "user", "oculto": False, "texto": "Le dejo un mensaje cifrado, señor Holmes. ¿Sabrá leerlo?",
         "desafio_html": fichas.desafio_html(desafio.cifrado, desafio.svg),
         "para_ia": "(El visitante te entrega un mensaje cifrado para que lo descifres: "
-                   f"{'[figuras danzantes]' if desafio.svg else desafio.cifrado})",
+                   f"{'[figuras danzantes]' if desafio.svg else partida.limpiar_etiquetas(desafio.cifrado)})",
     })
     resolver_desafio(desafio, analizar_desafio(desafio))
 
@@ -511,10 +528,11 @@ def mostrar_expedientes(m: dict) -> None:
             st.markdown(fichas.carpeta_expediente(opcion, elegida=m.get("elegido") == i,
                                                   apagada=m.get("elegido") not in (None, i)),
                         unsafe_allow_html=True)
-            if vigente and st.button("Abrir este expediente", key=f"expediente_{i}", width="stretch"):
+            if vigente and st.button("Abrir este expediente", key=f"expediente_{i}", width="stretch",
+                                     disabled=sin_cupo()):
                 abrir_expediente(i)
                 st.rerun()
-    if vigente and st.button("Ver otros expedientes", key="otros_expedientes"):
+    if vigente and st.button("Ver otros expedientes", key="otros_expedientes", disabled=sin_cupo()):
         S.enviados += 1
         ofrecer_expedientes()
         st.rerun()
@@ -583,19 +601,24 @@ def panel_pistas() -> None:
                 st.success(f"Código identificado: {pista.cifrado.nombre}")
             with st.form(f"solucion_{i}", clear_on_submit=False):
                 tipo = st.selectbox("¿Qué código es?", cifrados.nombres_para_elegir(), key=f"tipo_{i}")
-                texto = st.text_input("¿Qué dice?", key=f"texto_{i}")
-                enviar = st.form_submit_button("Proponer solución")
+                texto = st.text_input("¿Qué dice?", key=f"texto_{i}", max_chars=200)
+                enviar = st.form_submit_button("Proponer solución", disabled=sin_cupo())
             col1, col2 = st.columns(2)
             ayuda = col1.button(f"Pedir pista ({pista.ayudas}/3)", key=f"ayuda_{i}",
-                                disabled=pista.ayudas >= 3)
-            rendirse = col2.button("Rendirse", key=f"rendirse_{i}")
+                                disabled=pista.ayudas >= 3 or sin_cupo())
+            rendirse = col2.button("Rendirse", key=f"rendirse_{i}", disabled=sin_cupo())
+            if (enviar or ayuda or rendirse) and not sin_cupo():
+                S.enviados += 1  # cada uno le pide una respuesta a Holmes
+            else:
+                enviar = ayuda = rendirse = False
             if pista.ayudas:
                 st.markdown(fichas.nota_adhesiva(pista.cifrado.pistas[pista.ayudas - 1]), unsafe_allow_html=True)
 
             if enviar:
                 tipo_bien, texto_bien = pista.proponer(tipo, texto)
                 S.mensajes.append({"rol": "user", "oculto": False, "texto": f"📝 Propongo: *{tipo}* — «{texto}»",
-                                   "para_ia": f"(El visitante propone para el mensaje {i + 1}: {tipo} — «{texto}»)"})
+                                   "para_ia": f"(El visitante propone para el mensaje {i + 1}: {tipo} — "
+                                              f"«{partida.limpiar_etiquetas(texto)}»)"})
                 if pista.estado == "resuelta":
                     resumen = f"¡Resuelto! Decía «{pista.cifrado.mensaje}». Puntos: {pista.puntos}."
                 else:
@@ -634,9 +657,11 @@ def panel_acusacion() -> None:
         st.caption("Es definitiva: piénsela bien.")
         with st.form("acusacion"):
             culpable = st.selectbox("Culpable", [s.nombre for s in caso.sospechosos])
-            movil = st.text_area("Móvil", placeholder="¿Por qué lo hizo?")
+            movil = st.text_area("Móvil", placeholder="¿Por qué lo hizo?", max_chars=500)
             acusar = st.form_submit_button("Acusar")
         if acusar:
+            S.enviados += 1  # la acusación siempre se acepta (es el final del caso), pero cuenta
+            movil = movil[:500]
             S.mensajes.append({"rol": "user", "oculto": False,
                                "texto": f"⚖️ Acuso a **{culpable}**. Móvil: {movil}"})
             try:
@@ -655,7 +680,7 @@ def panel_acusacion() -> None:
             nota_oculta(
                 f"[RESULTADO] ACUSACIÓN FINAL. Culpable propuesto: {culpable} "
                 f"({'CORRECTO' if culpable_bien else 'INCORRECTO'}). Móvil "
-                f"{'CORRECTO' if movil_bien else 'INCORRECTO'} ({comentario}). Puntaje final: "
+                f"{'CORRECTO' if movil_bien else 'INCORRECTO'} ({partida.limpiar_etiquetas(comentario)}). Puntaje final: "
                 f"{S.puntaje_final}. El caso ha terminado: revela la solución completa con tu "
                 "razonamiento, como en el final de tus relatos. [/RESULTADO]")
             # El tablero con el hilo rojo se arma ahora y queda guardado en el mensaje (no depende de Gemini)
@@ -820,6 +845,6 @@ if S.modo == "B" and S.caso is not None and not S.terminado and not limite:
 if S.modo == "B" and S.terminado and puede_pedir_relato():
     acciones_fin_de_caso()
 
-if entrada := st.chat_input("Hable con Holmes...", disabled=limite):
+if entrada := st.chat_input("Hable con Holmes...", disabled=limite, max_chars=MAX_CARACTERES):
     procesar_mensaje(entrada)
     st.rerun()

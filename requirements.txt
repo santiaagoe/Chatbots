@@ -1,7 +1,8 @@
-streamlit>=1.60
-google-genai>=1.40
-fastmcp>=2.12
-python-dotenv>=1.0
-pydantic>=2.7
-pytest>=8.0
-httpx>=0.27
+# Versiones exactas con las que se probó el proyecto (así Streamlit Cloud instala las mismas)
+streamlit==1.65.0
+google-genai==2.29.0
+fastmcp==4.1.0
+python-dotenv==1.2.4
+pydantic==2.14.1
+pytest==9.1.1
+httpx==0.28.1

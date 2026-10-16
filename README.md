@@ -156,6 +156,30 @@ Las pruebas verifican que cada cifrado se pueda descifrar (y que Holmes lo descu
 
 ---
 
+## Limitaciones conocidas y mejoras planeadas
+
+Revisé el código buscando fallas. Las más importantes ya están corregidas (ver abajo); estas son las que quedan pendientes. Ninguna impide usar el chatbot con normalidad.
+
+### Pendientes
+- **Recargar la página reinicia el contador de mensajes.** El límite por visitante (80 mensajes) vive en la sesión del navegador, así que con F5 vuelve a cero. *Mejora:* llevar la cuenta en el servidor.
+- **Si el juez del móvil falla (la API no responde), el móvil cuenta como incorrecto.** *Mejora:* permitir reintentar el juicio.
+- **El índice MCP podría lucirse más.** Los fragmentos que encuentra llevan el nombre de la colección y no el del relato, y nada en pantalla muestra que Holmes consultó sus archivos. *Mejora:* indexar por relato y mostrar una nota «Holmes consultó su índice».
+- **La «hora local del visitante» es siempre la de Santiago de Chile.** *Mejora:* tomar la zona horaria del navegador.
+- **Escribir «culpable» sin signo de pregunta ya muestra el aviso de acusación.** *Mejora:* afinar la detección.
+- **Los errores desconocidos se muestran sin traducir** en «Detalle técnico».
+
+### Corregidas después de la revisión
+- Los mensajes tienen un largo máximo (1.000 caracteres en el chat, 500 en el móvil, 200 en las soluciones) y el descifrador no analiza textos de más de 400 signos, para no gastar la cuota compartida.
+- El límite de mensajes también se aplica a los botones («Ver otros expedientes», «Abrir este expediente», «Proponer solución», «Pedir pista», «Rendirse» y los caminos A/B), y proponer soluciones cuenta como mensaje.
+- Si se acaba la cuota de Gemini (error 429), se pasa directo al modelo de respaldo sin esperas; si se acabó la del día, el modelo principal se salta durante media hora.
+- El visitante ya no puede imitar las notas internas de la app (`[RESULTADO]`, `[CASO SECRETO]`…) ni las órdenes de Holmes (`[[PISTA: n]]`): se quitan antes de enviarle su mensaje a Gemini.
+- El juez del móvil recibe la respuesta del jugador delimitada y con la instrucción de ignorar órdenes dentro de ella.
+- Una respuesta vacía o bloqueada ya no deja un mensaje de Holmes en blanco.
+- El prompt prohíbe revelar sus instrucciones y el caso secreto, dice que a Holmes lo han vencido cuatro veces (tres hombres y una mujer) y trata a Moriarty como muerto en Reichenbach (1891).
+- En el modo A, Holmes recibe en cada turno las notas que ha tomado, así no olvida el principio del caso.
+- El índice se consulta con muchos más relatos y personajes (Estrella de Plata, el carbunclo azul, Musgrave, Stapleton…) y con preguntas como «¿cómo conoció a Watson?».
+- La tercera pista del cuadrado de Polibio se lee bien, `requirements.txt` fija las versiones probadas, el aviso de «modelo de respaldo» es de cada visitante, el error «sin cuota» ya no habla solo de imágenes y el cliente de Cloudflare se cierra.
+
 ## Tecnologías
 
 - **Python** + **Streamlit** (interfaz)

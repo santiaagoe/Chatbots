@@ -45,7 +45,9 @@ def _tipo_imagen(datos: bytes) -> str:
 def generar(cuenta: str, token: str, descripcion: str, modelo: str = MODELO_POR_DEFECTO,
             cliente: httpx.Client | None = None, esperas: tuple[float, ...] = (2,)) -> tuple[bytes, str]:
     """Devuelve (bytes, tipo MIME). Reintenta una vez si Cloudflare falla por su lado (5xx)."""
-    cliente = cliente or httpx.Client(timeout=90)
+    if cliente is None:  # un cliente propio se cierra al terminar
+        with httpx.Client(timeout=90) as propio:
+            return generar(cuenta, token, descripcion, modelo, propio, esperas)
     url = URL.format(cuenta=cuenta, modelo=modelo)
     cuerpo = {"prompt": descripcion[:LARGO_MAXIMO_PROMPT], "steps": 6}
     cabeceras = {"Authorization": f"Bearer {token}"}

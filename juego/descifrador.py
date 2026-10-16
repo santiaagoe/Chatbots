@@ -335,6 +335,9 @@ def _tercera(texto: str) -> str | None:
     return " ".join(palabras[2::3])
 
 
+MAX_LARGO_DESAFIO = 400  # un texto más largo no se analiza: probarlo todo tomaría demasiado
+
+
 def analizar(texto: str, claves_extra: list[str] | None = None, clave_dada: str | None = None) -> Hallazgo:
     """Descubre qué cifrado usó el visitante y qué dice. Nunca inventa: si no hay certeza, lo dice.
 
@@ -344,6 +347,10 @@ def analizar(texto: str, claves_extra: list[str] | None = None, clave_dada: str 
     crudo = _normalizar_signos(texto)
     if not crudo:
         return Hallazgo(None, observaciones=["El papel está en blanco."])
+    if len(crudo) > MAX_LARGO_DESAFIO:
+        return Hallazgo(None, observaciones=[
+            f"El mensaje es demasiado largo para analizarlo de una vez (más de {MAX_LARGO_DESAFIO} signos).",
+            "Pídale que se lo entregue en trozos más breves."])
 
     for tipo, funcion, observacion in (
         ("morse", _morse, "Solo hay puntos y rayas: es el alfabeto de los telegrafistas."),

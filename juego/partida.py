@@ -65,7 +65,16 @@ _CANON = re.compile(
     r"(moriarty|irene|adler|lestrade|gregson|mycroft|hudson|wiggins|irregulares|baskerville|sabueso|"
     r"reichenbach|bohemia|pelirroj|banda de lunares|speckled|escarlata|scarlet|signo de los cuatro|"
     r"valle del miedo|gloria scott|bailarines|dancing men|milverton|moran|mary morstan|"
-    r"\bwatson\b.*\b(conoci|primer|afganist)|afganist|tus casos|sus casos|caso antiguo|casos antiguos|"
+    r"estrella de plata|silver blaze|carbunclo|blue carbuncle|musgrave|stapleton|hombre del labio|"
+    r"labio retorcido|cinco semillas|semillas de naranja|orange pips|corona de berilos|hayas cobrizas|"
+    r"copper beeches|pulgar del ingeniero|aristócrata solterón|noble bachelor|caso de identidad|"
+    r"tratado naval|naval treaty|problema final|final problem|casa vacía|empty house|jorobado|crooked man|"
+    r"intérprete griego|greek interpreter|paciente residente|corredor de bolsa|stockbroker|"
+    r"cara amarilla|yellow face|ciclista solitario|colegio priory|priory school|peter el negro|black peter|"
+    r"seis napoleones|six napoleons|tres estudiantes|lentes de oro|golden pince|abbey grange|"
+    r"segunda mancha|second stain|norwood|charles augustus|irene adler|reina? de bohemia|"
+    r"\bwatson\b.*\b(conoci|primer|afganist)|\b(conoci|conoció|primer)\w*\b.*\bwatson\b|afganist|"
+    r"tus casos|sus casos|caso antiguo|casos antiguos|"
     r"aventura de|recuerda (el|la|cuando)|cu[eé]nteme (de|sobre) (su|el) caso|\bcanon\b|conan doyle|"
     r"en sus libros|sus relatos|sus memorias|cita textual|c[oó]mo muri[oó]|cataratas)", re.IGNORECASE)
 
@@ -156,6 +165,21 @@ PRESENTA_EXPEDIENTES = [
     "«Tengo tres asuntos pendientes», dice Holmes, extendiendo tres carpetas sobre la alfombra. «Escoja el que más le intrigue.»",
     "Holmes saca tres expedientes del cajón y los alinea con precisión. «Lestrade me ha traído estos esta semana. ¿Cuál le parece más singular?»",
 ]
+# Etiquetas internas que el visitante no debe poder imitar desde el chat
+_ETIQUETAS_INTERNAS = re.compile(
+    r"\[\s*/?\s*(CASO SECRETO|PISTA CIFRADA|AYUDA CIFRADO|RESULTADO|INICIO CASO|CONTEXTO|AVISO ACUSACION|"
+    r"SUGERIR ACUSACION|DESAFIO|ESTADO ACTUAL)[^\]]*\]|\[\[[^\]]*\]\]", re.IGNORECASE)
+
+RESPUESTA_VACIA = ("*Holmes guarda silencio un momento, la pipa entre los dientes.* «Prefiero no ocuparme de "
+                   "eso. Volvamos a lo que nos interesa, colega: ¿qué más puede contarme?»")
+
+
+def limpiar_etiquetas(texto: str) -> str:
+    """Quita del texto del visitante cualquier cosa que imite una nota de la aplicación ([RESULTADO]…)
+    o una orden de Holmes ([[PISTA: 1]]). Así nadie puede «terminar» el caso escribiendo en el chat."""
+    return _ETIQUETAS_INTERNAS.sub("", texto or "")
+
+
 _RESTOS = re.compile(r"\[/?(CASO SECRETO|PISTA CIFRADA|AYUDA CIFRADO|RESULTADO|INICIO CASO|CONTEXTO|"
                      r"AVISO ACUSACION|SUGERIR ACUSACION|DESAFIO)\]?", re.IGNORECASE)
 
@@ -289,13 +313,15 @@ def pista_a_revelar(pistas: list[PistaCifrada], mensajes_en_caso: int) -> int | 
 def instruccion_sistema(prompt: str, modo: str | None, caso: Caso | None,
                         pistas: list[PistaCifrada], terminado: bool, imagenes_usadas: int,
                         imagenes_activas: bool = True, pistas_anotadas: list[int] | None = None,
-                        escena_dibujada: bool = False) -> str:
+                        escena_dibujada: bool = False, notas_a: list[str] | None = None) -> str:
     partes = [prompt, "\n\n---\n\n# ESTADO ACTUAL (información de la aplicación)"]
     if modo is None:
         partes.append("El visitante aún no ha elegido un camino.")
     elif modo == "A":
         partes.append("Modo A: el visitante te trae un caso. No solicites imágenes. Cuando el visitante "
                       "te dé un dato importante del caso, anótalo al final con [[NOTA: dato breve]].")
+        if notas_a:  # así Holmes no olvida el principio del caso en conversaciones largas
+            partes.append("Datos que ya anotaste de su caso (no vuelvas a anotarlos): " + "; ".join(notas_a))
     elif caso is None:
         partes.append("Modo B: el visitante está eligiendo uno de tres expedientes que la aplicación "
                       "le muestra. Si te pregunta, comenta brevemente y anímalo a elegir uno.")
